@@ -27,6 +27,7 @@ let ExcludedSystem  = dynamic([]);
 let SpecifiedUser   = dynamic([]);
 let ExcludedUser    = dynamic([]);
 let MITR3Search     = dynamic([]);
+let MITR3Exclusion  = dynamic([]);
 let StartTime       = datetime(2026-01-21, 00:00:00);
 let EndTime         = datetime(2026-01-21, 23:59:59);
 //--------------------------Variable Assignment--------------------------\\
@@ -85,7 +86,8 @@ let BaselineSecEvent = view() { SecurityEvent
 | extend UnifiedAccount = iff(isnotempty(Account), tostring(split(Account,"\\")[1]), UnifiedAccount)
 | where (array_length(SpecifiedUser) == 0 or UnifiedAccount in~ (SpecifiedUser))
     and (array_length(ExcludedUser) == 0 or not(UnifiedAccount has_any (ExcludedUser)))
-| where (array_length(MITR3Search) == 0 or TechniqueID in~ (MITR3Search))};
+| where (array_length(MITR3Search) == 0 or TechniqueID in~ (MITR3Search))
+    and (array_length(MITR3Exclusion) == 0 or not(TechniqueID has_any (MITR3Exclusion)))};
 let FileOrObjectAccessEvents = materialize ( BaselineSecEvent
 | where "FileAccess" in~ (EventType)
 | where (EventID in (2,6,7,11,12,13,14,15,17,23,24,28)

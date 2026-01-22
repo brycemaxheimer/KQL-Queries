@@ -64,11 +64,11 @@ EndTime: The end of the query time range.
 ## Output Schema
 The query produces a table with the following standardized columns:
 
-Column	                Data Type	  Description
-TimeGenerated	          datetime	  The timestamp of the event.
-Computer	              string	    The name of the host where the event occurred.
-UnifiedAccount	        string	    The normalized user or system account associated with the event.
-EventID	                int	        The Windows Event ID.
-AdditionalInformation	  dynamic	    An array containing context-specific data, such as file hashes or MITRE ATT&CK tactics.
-MITR3Association	      string	    The associated MITRE ATT&CK Technique ID and name.
-EventData	              string	    The original, raw event data, potentially reconstructed for clarity.
+| Column | Data Type | Description |
+| TimeGenerated	| datetime | The timestamp of the event. |
+| Computer | string | The name of the host where the event occurred. |
+| UnifiedAccount | string | The normalized user or system account associated with the event. |
+| EventID | int | The Windows Event ID. |
+| AdditionalInformation | dynamic | An array containing context-specific data, such as file hashes or MITRE ATT&CK tactics. |
+| MITR3Association | string | The associated MITRE ATT&CK Technique ID and name. |
+| EventData | string | The original, raw event data, potentially reconstructed for clarity. |

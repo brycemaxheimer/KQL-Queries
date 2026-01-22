@@ -65,6 +65,7 @@ EndTime: The end of the query time range.
 The query produces a table with the following standardized columns:
 
 | Column | Data Type | Description |
+|--------|-----------|-------------|
 | TimeGenerated	| datetime | The timestamp of the event. |
 | Computer | string | The name of the host where the event occurred. |
 | UnifiedAccount | string | The normalized user or system account associated with the event. |

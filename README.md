@@ -2,7 +2,7 @@
 ## Overview
 This is an advanced Kusto Query Language (KQL) query designed to provide a unified and enriched view of security events from multiple sources within a Microsoft Sentinel environment. Its primary purpose is to normalize disparate log formats, particularly from Windows Security Auditing and Sysmon, into a single, consistent schema. The query is architected for modularity and scalability, allowing analysts to select and combine different event types for analysis without modifying the core query logic.
 
-##Features
+## Features
 Unified Schema: Ingests and normalizes logs from different sources (SecurityEvent, Sysmon) into a single, predictable table structure.
 
 Centralized Filtering: User-defined filters for time, systems, and accounts are configured in a single location and applied efficiently at the base of the query.
@@ -15,7 +15,7 @@ Modular Architecture: The query is broken into logical, self-contained blocks fo
 
 Robust Account Normalization: Intelligently parses account names from multiple potential fields (User, TargetUserName, SubjectUserName, Account) to create a single, reliable UnifiedAccount column, correctly handling both DOMAIN\User and standalone user formats.
 
-##Architecture
+## Architecture
 The query is designed using a multi-stage, modular pattern to ensure efficiency and maintainability.
 
 Configuration Block: At the top of the query, a series of let statements define all user-configurable parameters. This is the only section an analyst needs to interact with for day-to-day use.
@@ -44,7 +44,7 @@ It concludes by projecting a standardized set of columns to ensure its schema is
 
 union and project-reorder: The final stage unions the results from the executed modules and uses project-reorder to enforce a final, consistent column order for the output.
 
-##Configuration
+## Configuration
 To use the query, modify the let statements in the top section.
 
 EventType: A dynamic array specifying which modules to run (e.g., ["FileAccess", "SystemAccess"]).
@@ -61,7 +61,7 @@ StartTime: The start of the query time range.
 
 EndTime: The end of the query time range.
 
-##Output Schema
+## Output Schema
 The query produces a table with the following standardized columns:
 
 Column	                Data Type	  Description

@@ -1,0 +1,227 @@
+//--------------------Query Functionality Explanation--------------------\\
+//                                                                       \\
+// This query is designed to be a "Mega Query" that maintains multiple   \\
+// functionalities in one, making querying a system by event types easier\\
+//                                                                       \\
+// You only NEED to interact with a few things at the start of the query \\
+// to begin using it. The first is EventType (I will outline the         \\
+// different types later), which sets what Windows Events you will focus \\
+// on. It is possible to put multiple EventTypes in the EventType array  \\
+// however dont go overboard due to the amount of data that may output.  \\
+//                                                                       \\
+// The other is the StartTime and EndTime variables for obvious reasons. \\
+// The query WILL run without specifying a Computer or Account but it's  \\
+// not recommended to do so. They are set as dynamic arrays so it's      \\
+// possible to run the query searching for more than one User\System at a\\
+// time if needed. Otherwise it's fully self-sufficient. Enjoy!          \\
+//                                                                       \\
+//--------------------Query Functionality Explanation--------------------\\
+//-----------------------------------------------------------------------\\
+//--------------------------Function Assignment--------------------------\\
+let EventType       = dynamic([]);
+//--------------------------Function Assignment--------------------------\\
+//-----------------------------------------------------------------------\\
+//--------------------------Variable Assignment--------------------------\\
+let SpecifiedSystem = dynamic([]);
+let ExcludedSystem  = dynamic([]);
+let SpecifiedUser   = dynamic([]);
+let ExcludedUser    = dynamic([]);
+let MITR3Search     = dynamic([]);
+let MITR3Exclusion  = dynamic([]);
+let StartTime       = datetime(2026-01-21, 00:00:00);
+let EndTime         = datetime(2026-01-21, 23:59:59);
+//--------------------------Variable Assignment--------------------------\\
+//-----------------------------------------------------------------------\\
+//--------------------------Datatable Assignment-------------------------\\
+let MITR3Associations = datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string,Tactic:string)
+[   //---------- Logon/Logoff Events ----------
+    4624, "Microsoft-Windows-Security-Auditing", "Successful Logon", "T1078", "Valid Accounts", "Defense Evasion, Persistence, Privilege Escalation, Initial Access",
+    4625, "Microsoft-Windows-Security-Auditing", "Failed Logon", "T1110.001", "Password Guessing", "Credential Access",
+    4625, "Microsoft-Windows-Security-Auditing", "Failed Logon", "T1110.002", "Password Spraying", "Credential Access",
+    4648, "Microsoft-Windows-Security-Auditing", "Explicit Credentials Logon", "T1550.002", "Pass the Hash / Pass the Ticket", "Lateral Movement",
+    4776, "Microsoft-Windows-Security-Auditing", "NTLM Credential Validation", "T1550.002", "Pass the Hash", "Credential Access",
+    4634, "Microsoft-Windows-Security-Auditing", "Account Logoff", "N/A", "Auditing / Session Context", "N/A",
+    4647, "Microsoft-Windows-Security-Auditing", "User Initiated Logoff", "N/A", "Auditing / Session Context", "N/A",
+    4779, "Microsoft-Windows-Security-Auditing", "Session Disconnected", "N/A", "Auditing / Session Context", "N/A",
+    //---------- Sysmon Events ----------
+    2,  "Microsoft-Windows-Sysmon", "File Creation Time Change", "T1070.006", "Timestomp", "Defense Evasion",
+    6,  "Microsoft-Windows-Sysmon", "Driver Loaded", "T1547.006", "Kernel Modules and Extensions", "Persistence, Privilege Escalation",
+    7,  "Microsoft-Windows-Sysmon", "Image Loaded", "T1574.002", "DLL Sideloading", "Defense Evasion, Persistence, Privilege Escalation",
+    11, "Microsoft-Windows-Sysmon", "FileCreate", "T1105", "Ingress Tool Transfer", "Command and Control",
+    12, "Microsoft-Windows-Sysmon", "Registry Object Create/Delete", "T1547.001", "Registry Run Keys / Startup Folder", "Persistence, Privilege Escalation",
+    13, "Microsoft-Windows-Sysmon", "Registry Value Set", "T1112", "Modify Registry", "Defense Evasion",
+    14, "Microsoft-Windows-Sysmon", "Registry Object Renamed", "T1112", "Modify Registry", "Defense Evasion",
+    15, "Microsoft-Windows-Sysmon", "File Stream Created", "T1564.001", "Hidden Files and Directories (ADS)", "Defense Evasion",
+    17, "Microsoft-Windows-Sysmon", "Pipe Created", "T1559.001", "Inter-Process Communication: Named Pipe", "Execution",
+    23, "Microsoft-Windows-Sysmon", "File Deleted", "T1070.004", "File Deletion", "Defense Evasion",
+    24, "Microsoft-Windows-Sysmon", "Clipboard Data Captured", "T1115", "Clipboard Data", "Collection",
+    28, "Microsoft-Windows-Sysmon", "File Blocked", "N/A", "Defensive Action (File Block)", "N/A",
+    //---------- File/Object Access Events (Security Auditing) ----------
+    4656, "Microsoft-Windows-Security-Auditing", "Handle to Object Requested", "T1055", "Process Injection", "Defense Evasion, Privilege Escalation",
+    4660, "Microsoft-Windows-Security-Auditing", "Object Deleted", "T1070.004", "File Deletion", "Defense Evasion",
+    4663, "Microsoft-Windows-Security-Auditing", "Attempt to Access Object", "T1558", "Steal or Forge Kerberos Tickets (NTDS)", "Credential Access",
+    4670, "Microsoft-Windows-Security-Auditing", "Permissions on Object Changed", "T1222.001", "File and Directory Permissions Modification", "Defense Evasion",
+    4674, "Microsoft-Windows-Security-Auditing", "Privileged Object Operation", "T1134", "Access Token Manipulation", "Defense Evasion, Privilege Escalation",
+    4690, "Microsoft-Windows-Security-Auditing", "Attempt to Duplicate Handle", "T1055", "Process Injection", "Defense Evasion, Privilege Escalation",
+    4907, "Microsoft-Windows-Security-Auditing", "Audit Settings on Object Changed", "T1562", "Impair Defenses", "Defense Evasion",
+    5136, "Microsoft-Windows-Security-Auditing", "Directory Service Object Created", "T1098", "Account Manipulation", "Persistence, Privilege Escalation",
+    5137, "Microsoft-Windows-Security-Auditing", "Directory Service Object Modified", "T1484", "Domain Policy Modification", "Defense Evasion",
+    5141, "Microsoft-Windows-Security-Auditing", "Directory Service Object Deleted", "T1098", "Account Manipulation", "Persistence, Privilege Escalation"
+];
+let BaselineSecEvent = view() { SecurityEvent
+| where TimeGenerated between (StartTime .. EndTime)
+| lookup kind=leftouter MITR3Associations on EventID, EventSourceName
+| extend MITR3Association = coalesce(strcat(TechniqueID, ": ", TechniqueName), "N/A"),
+         AdditionalInformation = iff(isnotempty(Tactic), pack_array(strcat("Tactic: ", Tactic)), dynamic([]))
+| extend Computer = tostring(split(Computer,".")[0])
+| where (array_length(SpecifiedSystem) == 0 or Computer in~ (SpecifiedSystem))
+    and (array_length(ExcludedSystem) == 0 or not(Computer has_any (ExcludedSystem)))
+| parse EventData with *'SubjectUserName">'SubjectUserName'</Data>'*
+| parse EventData with *'TargetUserName">'TargetUserName'</Data>'*
+| parse EventData with *'<Data Name="User">'User'</Data>'*
+| extend UnifiedAccount = coalesce(SubjectUserName, TargetUserName,
+    iff(SubjectAccount contains "\\", tostring(split(SubjectAccount, "\\")[1]), SubjectAccount),
+    iff(Account contains "\\", tostring(split(Account, "\\")[1]), Account),
+    iff(User contains "\\", tostring(split(User, "\\")[1]), User))
+| extend UnifiedAccount = iff(isnotempty(Account), tostring(split(Account,"\\")[1]), UnifiedAccount)
+| where (array_length(SpecifiedUser) == 0 or UnifiedAccount in~ (SpecifiedUser))
+    and (array_length(ExcludedUser) == 0 or not(UnifiedAccount has_any (ExcludedUser)))
+| where (array_length(MITR3Search) == 0 or TechniqueID in~ (MITR3Search))
+    and (array_length(MITR3Exclusion) == 0 or not(TechniqueID has_any (MITR3Exclusion)))};
+let FileOrObjectAccessEvents = materialize ( BaselineSecEvent
+| where "FileAccess" in~ (EventType)
+| where (EventID in (2,6,7,11,12,13,14,15,17,23,24,28)
+    and EventSourceName contains "Microsoft-Windows-Sysmon")
+     or (EventID in (4662,4663,4656,4670,4691,4715,4907,4659,4660,4661,4674,4690,4913,4934,4937,5136,5137,5138,5139,5141)
+      and EventSourceName contains "Microsoft-Windows-Security-Auditing")
+| parse EventData with *'<Data Name="Hashes">'Hashes'</Data>'*
+| extend ParsedHashes = split(Hashes, ",")
+| extend SHA256  = ParsedHashes[2], IMPHASH = ParsedHashes[3]
+| extend HashInfo = 
+    iff((isnotempty(SHA256)  and isnotempty(IMPHASH)), strcat(SHA256,", ",IMPHASH),
+    iff((isnotempty(SHA256)  and isempty(IMPHASH)), SHA256,
+    iff((isnotempty(IMPHASH) and isempty(SHA256)), IMPHASH, @"N\A"))),
+    TacticInfo = iff(isnotempty(Tactic), strcat("Tactic: ", Tactic), "")
+| extend AdditionalInformation = case(
+        isnotempty(HashInfo) and isnotempty(TacticInfo), pack_array(TacticInfo, HashInfo),
+        isnotempty(TacticInfo), pack_array(TacticInfo),
+        isnotempty(HashInfo), pack_array(HashInfo),
+        dynamic([]))
+| extend Better4662 =
+    strcat('<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '  <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '  <Data Name="Keywords">',Keywords,'</Data>\n'
+           '  <Data Name="SystemProcessID">',SystemProcessId,'</Data>\n'
+           '  <Data Name="ThreadID">',SystemThreadId,'</Data>\n'
+           '  <Data Name="Computer">',Computer,'</Data>\n'
+           '  <Data Name="SubjectUser SID">',SubjectUserSid,'</Data>\n'
+           '  <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '  <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '  <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '  <Data Name="ObjectServer">',ObjectServer,'</Data>\n'
+           '  <Data Name="ObjectType">',ObjectType,'</Data>\n'
+           '  <Data Name="ObjectName">',ObjectName,'</Data>\n'
+           '  <Data Name="OperationType">',OperationType,'</Data>\n' 
+           '  <Data Name="HandleId">',HandleId,'</Data>\n'
+           '  <Data Name="AccessMask">',AccessMask,'</Data>\n' 
+           '  <Data Name="Properties">',Properties,'</Data>\n' 
+           '  <Data Name="AdditionalInfo">',AdditionalInfo,'</Data>\n'
+           '  <Data Name="AdditionalInfo2">',AdditionalInfo2,'</Data>\n'
+           '</EventData>')
+| extend EventData = iff(EventID == 4662, Better4662, EventData)
+| project TimeGenerated, Computer, EventID, UnifiedAccount, MITR3Association, AdditionalInformation, EventData);
+let SystemAccess = materialize ( BaselineSecEvent
+| where "SystemAccess" in~ (EventType)
+| where EventID in (4624,4625,4634,4647,4648,4776,4779)
+| extend Better4634 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+           '   <Data Name="TargetUserName">',TargetUserName,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="TargetLogonID">',TargetLogonId,'</Data>\n'
+           '   <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+           '   <Data Name="WorkstationName">',Computer,'</Data>\n'
+           '</EventData>')
+| extend Better4624 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="SubjectUser SID">',SubjectUserSid,'</Data>\n'
+           '   <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '   <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '   <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '   <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+           '   <Data Name="TargetUserName">',TargetUserName,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="TargetLogonID">',TargetLogonId,'</Data>\n'
+           '   <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+           '   <Data Name="LogonProcess">',LogonProcessName,'</Data>\n'
+           '   <Data Name="AuthenticationPackage">',AuthenticationPackageName,'</Data>\n'
+           '   <Data Name="WorkstationName">',Computer,'</Data>\n'
+           '   <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+           '   <Data Name="TransmittedServices">',TransmittedServices,'</Data>\n'
+           '   <Data Name="LmPackageName">',LmPackageName,'</Data>\n'
+           '   <Data Name="ProcessId">',ProcessId,'</Data>\n'
+           '   <Data Name="ProcessName">',ProcessName,'</Data>\n'
+           '   <Data Name="IpAddress">',IpAddress,'</Data>\n'
+           '   <Data Name="IpPort">',IpPort,'</Data>\n'
+           '</EventData>')
+| extend Better4625 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="Keywords">',Keywords,'</Data>\n'
+           '   <Data Name="SubjectUserSID">',SubjectUserSid,'</Data>\n'
+           '   <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '   <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '   <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '   <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+           '   <Data Name="TargetUserName">',TargetUserName,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="Status">',Status,'</Data>\n'
+           '   <Data Name="SubStatus">',SubStatus,'</Data>\n'
+           '   <Data Name="FailureReason">',FailureReason,'</Data>\n'
+           '   <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+           '   <Data Name="LogonProcess">',LogonProcessName,'</Data>\n'
+           '   <Data Name="AuthenticationPackage">',AuthenticationPackageName,'</Data>\n'
+           '   <Data Name="WorkstationName">',WorkstationName,'</Data>\n'
+           '   <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+           '   <Data Name="LmPackageName">',LmPackageName,'</Data>\n'
+           '   <Data Name="ProcessId">',ProcessId,'</Data>\n'
+           '   <Data Name="ProcessName">',ProcessName,'</Data>\n'
+           '   <Data Name="IpAddress">',IpAddress,'</Data>\n'
+           '   <Data Name="IpPort">',IpPort,'</Data>\n'
+           '</EventData>')
+| extend Better4648 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="SubjectUserSID">',SubjectUserSid,'</Data>\n'
+           '   <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '   <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '   <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '   <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+           '   <Data Name="TargetUserName">',UnifiedAccount,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="TargetLogonGuid">',TargetLogonGuid,'</Data>\n'
+           '   <Data Name="TargetServerName">',TargetServerName,'</Data>\n'
+           '   <Data Name="TargetInfo">',TargetInfo,'</Data>\n'
+           '   <Data Name="ProcessId">',ProcessId,'</Data>\n'
+           '   <Data Name="ProcessName">',ProcessName,'</Data>\n'
+           '   <Data Name="IpAddress">',IpAddress,'</Data>\n'
+           '   <Data Name="IpPort">',IpPort,'</Data>\n'
+           '</EventData>')
+| extend EventData =
+    iff(EventID == 4624, Better4624,
+    iff(EventID == 4648, Better4648,
+    iff(EventID == 4634, Better4634,
+    iff(EventID == 4625, Better4625,
+    EventData))))
+| project TimeGenerated, Computer, EventID, UnifiedAccount, EventData, MITR3Association);
+union FileOrObjectAccessEvents,SystemAccess
+| project-reorder
+    TimeGenerated,
+    Computer,
+    UnifiedAccount,
+    EventID,
+    MITR3Association,
+    AdditionalInformation,
+    EventData

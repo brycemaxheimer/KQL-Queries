@@ -1,0 +1,650 @@
+//--------------------Query Functionality Explanation--------------------\\
+//                                                                       \\
+// This query is designed to be a "Mega Query" that maintains multiple   \\
+// functionalities in one, making querying a system by event types easier\\
+//                                                                       \\
+// You only NEED to interact with a few things at the start of the query \\
+// to begin using it. The first is EventType (I will outline the         \\
+// different types later), which sets what Windows Events you will focus \\
+// on. It is possible to put multiple EventTypes in the EventType array  \\
+// however dont go overboard due to the amount of data that may output.  \\
+//                                                                       \\
+// The other is the StartTime and EndTime variables for obvious reasons. \\
+// The query WILL run without specifying a Computer or Account but it's  \\
+// not recommended to do so. They are set as dynamic arrays so it's      \\
+// possible to run the query searching for more than one User\System at a\\
+// time if needed. Otherwise it's fully self-sufficient. Enjoy!          \\
+//                                                                       \\
+//--------------------Query Functionality Explanation--------------------\\
+//-----------------------------------------------------------------------\\
+//--------------------------Function Assignment--------------------------\\
+let EventType       = dynamic(["SystemSecEvent"]);
+//--------------------------Function Assignment--------------------------\\
+//-----------------------------------------------------------------------\\
+//--------------------------Variable Assignment--------------------------\\
+let SpecifiedSystem = dynamic(["CIN-FRT49R3SHD"]);
+let ExcludedSystem  = dynamic([]);
+let SpecifiedUser   = dynamic([]);
+let ExcludedUser    = dynamic([]);
+let MITR3Search     = dynamic([]);
+let MITR3Exclusion  = dynamic([]);
+let Output_Detail   = dynamic(["Summarized"]);  // Detailed to return ALL results, Summarized to return grouped results
+let StartTime       = datetime(2026-01-21, 00:00:00);
+let EndTime         = datetime(2026-01-21, 23:59:59);
+//--------------------------Variable Assignment--------------------------\\
+//-----------------------------------------------------------------------\\
+//--------------------------Datatable Assignment-------------------------\\
+let MITR3Associations = datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string,Tactic:string)
+[   //---------- System Events ----------
+    4608, "Microsoft-Windows-Security-Auditing", "Windows is starting up.", "", "", "",
+    4609, "Microsoft-Windows-Security-Auditing", "Windows is shutting down.", "", "", "",
+    4610, "Microsoft-Windows-Security-Auditing", "An authentication package has been loaded by the Local Security Authority.", "", "", "",
+    4611, "Microsoft-Windows-Security-Auditing", "A trusted logon process has been registered with the Local Security Authority.", "", "", "",
+    4612, "Microsoft-Windows-Security-Auditing", "Internal resources allocated for the queuing of audit messages have been exhausted, leading to the loss of some audits.", "", "", "",
+    4614, "Microsoft-Windows-Security-Auditing", "A notification package has been loaded by the Security Account Manager.", "", "", "",
+    4615, "Microsoft-Windows-Security-Auditing", "Invalid use of LPC port.", "", "", "",
+    4616, "Microsoft-Windows-Security-Auditing", "The system time was changed.", "", "", "",
+    4618, "Microsoft-Windows-Security-Auditing", "A monitored security event pattern has occurred.", "", "", "",
+    4621, "Microsoft-Windows-Security-Auditing", "Administrator recovered system from CrashOnAuditFail.", "", "", "",
+    4622, "Microsoft-Windows-Security-Auditing", "A security package has been loaded by the Local Security Authority.", "", "", "",
+    4697, "Microsoft-Windows-Security-Auditing", "A service was installed in the system.", "T1543.003", "Create or Modify System Process: Windows Service", "Persistence, Privilege Escalation",
+    4816, "Microsoft-Windows-Security-Auditing", "RPC detected an integrity violation while decrypting an incoming message.", "", "", "",
+    4960, "Microsoft-Windows-Security-Auditing", "IPsec dropped an inbound packet that failed an integrity check.", "", "", "",
+    4961, "Microsoft-Windows-Security-Auditing", "IPsec dropped an inbound packet that failed a replay check.", "", "", "",
+    4962, "Microsoft-Windows-Security-Auditing", "IPsec dropped an inbound packet that failed a replay check.", "", "", "",
+    4963, "Microsoft-Windows-Security-Auditing", "IPsec dropped an inbound clear text packet that should have been secured.", "", "", "",
+    4965, "Microsoft-Windows-Security-Auditing", "IPsec received a packet from a remote computer with an incorrect Security Parameter Index (SPI).", "", "", "",
+    5038, "Microsoft-Windows-Security-Auditing", "Code integrity determined that the image hash of a file is not valid.", "", "", "",
+    5056, "Microsoft-Windows-Security-Auditing", "A cryptographic self test was performed.", "", "", "",
+    5057, "Microsoft-Windows-Security-Auditing", "A cryptographic primitive operation failed.", "", "", "",
+    5058, "Microsoft-Windows-Security-Auditing", "Key file operation.", "", "", "",
+    5059, "Microsoft-Windows-Security-Auditing", "Key migration operation.", "", "", "",
+    5060, "Microsoft-Windows-Security-Auditing", "Verification operation failed.", "", "", "",
+    5061, "Microsoft-Windows-Security-Auditing", "Cryptographic operation.", "", "", "",
+    5062, "Microsoft-Windows-Security-Auditing", "A kernel-mode cryptographic self test was performed.", "", "", "",
+    5071, "Microsoft-Windows-Security-Auditing", "Key access denied by Microsoft key distribution service.", "", "", "",
+    5478, "Microsoft-Windows-Security-Auditing", "IPsec Services has started successfully.", "", "", "",
+    5479, "Microsoft-Windows-Security-Auditing", "IPsec Services has been shut down successfully.", "", "", "",
+    5480, "Microsoft-Windows-Security-Auditing", "IPsec Services failed to get the complete list of network interfaces on the computer.", "", "", "",
+    5483, "Microsoft-Windows-Security-Auditing", "IPsec Services failed to initialize RPC server. IPsec Services could not be started.", "", "", "",
+    5484, "Microsoft-Windows-Security-Auditing", "IPsec Services has experienced a critical failure and has been shut down.", "", "", "",
+    5485, "Microsoft-Windows-Security-Auditing", "IPsec Services failed to process some IPsec filters on a plug-and-play event for network interfaces.", "", "", "",
+    6281, "Microsoft-Windows-Security-Auditing", "Code Integrity determined that the page hashes of an image file are not valid.", "", "", "",
+    6400, "Microsoft-Windows-Security-Auditing", "BranchCache: Received an incorrectly formatted response while discovering availability of content.", "", "", "",
+    6401, "Microsoft-Windows-Security-Auditing", "BranchCache: Received invalid data from a peer. Data discarded.", "", "", "",
+    6402, "Microsoft-Windows-Security-Auditing", "BranchCache: The message to the hosted cache offering it data is incorrectly formatted.", "", "", "",
+    6403, "Microsoft-Windows-Security-Auditing", "BranchCache: The hosted cache sent an incorrectly formatted response to the client.", "", "", "",
+    6404, "Microsoft-Windows-Security-Auditing", "BranchCache: Hosted cache could not be authenticated using the provisioned SSL certificate.", "", "", "",
+    6405, "Microsoft-Windows-Security-Auditing", "BranchCache: %2 instance(s) of event id %1 occurred.", "", "", "",
+    6406, "Microsoft-Windows-Security-Auditing", "%1 registered to Windows Firewall to control filtering for the following: %2", "", "", "",
+    6407, "Microsoft-Windows-Security-Auditing", "1%", "", "", "",
+    6408, "Microsoft-Windows-Security-Auditing", "Registered product %1 failed and Windows Firewall is now controlling the filtering for %2", "", "", "",
+    6409, "Microsoft-Windows-Security-Auditing", "BranchCache: A service connection point object could not be parsed.", "", "", "",
+    6410, "Microsoft-Windows-Security-Auditing", "Code integrity determined that a file does not meet the security requirements to load into a process.", "", "", "",
+    6416, "Microsoft-Windows-Security-Auditing", "A new external device was recognized by the System", "", "", "",
+    6417, "Microsoft-Windows-Security-Auditing", "The FIPS mode crypto selftests succeeded.", "", "", "",
+    6418, "Microsoft-Windows-Security-Auditing", "The FIPS mode crypto selftests failed.", "", "", "",
+    6419, "Microsoft-Windows-Security-Auditing", "A request was made to disable a device", "", "", "",
+    6420, "Microsoft-Windows-Security-Auditing", "A device was disabled.", "", "", "",
+    6421, "Microsoft-Windows-Security-Auditing", "A request was made to enable a device.", "", "", "",
+    6422, "Microsoft-Windows-Security-Auditing", "A device was enabled.", "", "", "",
+    6423, "Microsoft-Windows-Security-Auditing", "The installation of this device is forbidden by system policy", "", "", "",
+    6424, "Microsoft-Windows-Security-Auditing", "The installation of this device was allowed, after having previously been forbidden by policy.", "", "", "",
+    //---------- Privilege Events ----------
+    4672, "Microsoft-Windows-Security-Auditing", "Special privileges assigned to new logon.", "", "", "",
+    4673, "Microsoft-Windows-Security-Auditing", "A privileged service was called.", "", "", "",
+    4674, "Microsoft-Windows-Security-Auditing", "An operation was attempted on a privileged object.", "", "", "",
+    //---------- Microsoft-Windows-Security-Auditing Events ----------
+    4670, "Microsoft-Windows-Security-Auditing", "Permissions on an object were changed.", "", "", "",
+    4703, "Microsoft-Windows-Security-Auditing", "A user right was adjusted.", "", "", "",
+    4704, "Microsoft-Windows-Security-Auditing", "A user right was assigned.", "", "", "",
+    4705, "Microsoft-Windows-Security-Auditing", "A user right was removed.", "", "", "",
+    4706, "Microsoft-Windows-Security-Auditing", "A new trust was created to a domain.", "", "", "",
+    4707, "Microsoft-Windows-Security-Auditing", "A trust to a domain was removed.", "", "", "",
+    4709, "Microsoft-Windows-Security-Auditing", "IPsec Services was started.", "", "", "",
+    4710, "Microsoft-Windows-Security-Auditing", "IPsec Services was disabled.", "", "", "",
+    4711, "Microsoft-Windows-Security-Auditing", "PAStore Engine policy modification", "", "", "",
+    4713, "Microsoft-Windows-Security-Auditing", "Kerberos policy was changed.", "", "", "",
+    4714, "Microsoft-Windows-Security-Auditing", "Encrypted data recovery policy was changed.", "", "", "",
+    4715, "Microsoft-Windows-Security-Auditing", "The audit policy (SACL) on an object was changed.", "", "", "",
+    4716, "Microsoft-Windows-Security-Auditing", "Trusted domain information was modified.", "", "", "",
+    4717, "Microsoft-Windows-Security-Auditing", "System security access was granted to an account.", "", "", "",
+    4718, "Microsoft-Windows-Security-Auditing", "System security access was removed from an account.", "", "", "",
+    4719, "Microsoft-Windows-Security-Auditing", "System audit policy was changed.", "", "", "",
+    4739, "Microsoft-Windows-Security-Auditing", "Domain Policy was changed.", "", "", "",
+    4817, "Microsoft-Windows-Security-Auditing", "Auditing settings on an object were changed.", "", "", "",
+    4819, "Microsoft-Windows-Security-Auditing", "Central Access Policies on the machine have been changed.", "", "", "",
+    4826, "Microsoft-Windows-Security-Auditing", "Boot Configuration Data loaded.", "", "", "",
+    4864, "Microsoft-Windows-Security-Auditing", "A namespace collision was detected.", "", "", "",
+    4865, "Microsoft-Windows-Security-Auditing", "A trusted forest information entry was added.", "", "", "",
+    4866, "Microsoft-Windows-Security-Auditing", "A trusted forest information entry was removed.", "", "", "",
+    4867, "Microsoft-Windows-Security-Auditing", "A trusted forest information entry was modified.", "", "", "",
+    4902, "Microsoft-Windows-Security-Auditing", "The Per-user audit policy table was created.", "", "", "",
+    4904, "Microsoft-Windows-Security-Auditing", "An attempt was made to register a security event source.", "", "", "",
+    4905, "Microsoft-Windows-Security-Auditing", "An attempt was made to unregister a security event source.", "", "", "",
+    4906, "Microsoft-Windows-Security-Auditing", "The CrashOnAuditFail value has changed.", "", "", "",
+    4907, "Microsoft-Windows-Security-Auditing", "Auditing settings on object were changed.", "", "", "",
+    4908, "Microsoft-Windows-Security-Auditing", "Special Groups Logon table modified.", "", "", "",
+    4909, "Microsoft-Windows-Security-Auditing", "The local policy settings for the TBS were changed.", "", "", "",
+    4910, "Microsoft-Windows-Security-Auditing", "The group policy settings for the TBS were changed.", "", "", "",
+    4911, "Microsoft-Windows-Security-Auditing", "Resource attributes of the object were changed.", "", "", "",
+    4912, "Microsoft-Windows-Security-Auditing", "Per User Audit Policy was changed.", "", "", "",
+    4913, "Microsoft-Windows-Security-Auditing", "Central Access Policy on the object was changed.", "", "", "",
+    5040, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. An Authentication Set was added.", "", "", "",
+    5041, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. An Authentication Set was modified.", "", "", "",
+    5042, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. An Authentication Set was deleted.", "", "", "",
+    5043, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. A Connection Security Rule was added.", "", "", "",
+    5044, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. A Connection Security Rule was modified.", "", "", "",
+    5045, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. A Connection Security Rule was deleted.", "", "", "",
+    5046, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. A Crypto Set was added.", "", "", "",
+    5047, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. A Crypto Set was modified.", "", "", "",
+    5048, "Microsoft-Windows-Security-Auditing", "A change has been made to IPsec settings. A Crypto Set was deleted.", "", "", "",
+    5063, "Microsoft-Windows-Security-Auditing", "A cryptographic provider operation was attempted.", "", "", "",
+    5064, "Microsoft-Windows-Security-Auditing", "A cryptographic context operation was attempted.", "", "", "",
+    5065, "Microsoft-Windows-Security-Auditing", "A cryptographic context modification was attempted.", "", "", "",
+    5066, "Microsoft-Windows-Security-Auditing", "A cryptographic function operation was attempted.", "", "", "",
+    5067, "Microsoft-Windows-Security-Auditing", "A cryptographic function modification was attempted.", "", "", "",
+    5068, "Microsoft-Windows-Security-Auditing", "A cryptographic function provider operation was attempted.", "", "", "",
+    5069, "Microsoft-Windows-Security-Auditing", "A cryptographic function property operation was attempted.", "", "", "",
+    5070, "Microsoft-Windows-Security-Auditing", "A cryptographic function property modification was attempted.", "", "", "",
+    5440, "Microsoft-Windows-Security-Auditing", "The following callout was present when the Windows Filtering Platform Base Filtering Engine started.", "", "", "",
+    5441, "Microsoft-Windows-Security-Auditing", "The following filter was present when the Windows Filtering Platform Base Filtering Engine started.", "", "", "",
+    5442, "Microsoft-Windows-Security-Auditing", "The following provider was present when the Windows Filtering Platform Base Filtering Engine started.", "", "", "",
+    5443, "Microsoft-Windows-Security-Auditing", "The following provider context was present when the Windows Filtering Platform Base Filtering Engine started.", "", "", "",
+    5444, "Microsoft-Windows-Security-Auditing", "The following sub-layer was present when the Windows Filtering Platform Base Filtering Engine started.", "", "", "",
+    5446, "Microsoft-Windows-Security-Auditing", "A Windows Filtering Platform callout has been changed.", "", "", "",
+    5447, "Microsoft-Windows-Security-Auditing", "A Windows Filtering Platform filter has been changed.", "", "", "",
+    5448, "Microsoft-Windows-Security-Auditing", "A Windows Filtering Platform provider has been changed.", "", "", "",
+    5449, "Microsoft-Windows-Security-Auditing", "A Windows Filtering Platform provider context has been changed.", "", "", "",
+    5450, "Microsoft-Windows-Security-Auditing", "A Windows Filtering Platform sub-layer has been changed.", "", "", "",
+    5456, "Microsoft-Windows-Security-Auditing", "PAStore Engine applied Active Directory storage IPsec policy on the computer.", "", "", "",
+    5457, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to apply Active Directory storage IPsec policy on the computer.", "", "", "",
+    5458, "Microsoft-Windows-Security-Auditing", "PAStore Engine applied locally cached copy of Active Directory storage IPsec policy on the computer.", "", "", "",
+    5459, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to apply locally cached copy of Active Directory storage IPsec policy on the computer.", "", "", "",
+    5460, "Microsoft-Windows-Security-Auditing", "PAStore Engine applied local registry storage IPsec policy on the computer.", "", "", "",
+    5461, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to apply local registry storage IPsec policy on the computer.", "", "", "",
+    5462, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to apply some rules of the active IPsec policy on the computer..", "", "", "",
+    5463, "Microsoft-Windows-Security-Auditing", "PAStore Engine polled for changes to the active IPsec policy and detected no changes.", "", "", "",
+    5464, "Microsoft-Windows-Security-Auditing", "PAStore Engine polled for changes to the active IPsec policy, detected changes, and applied them to IPsec Services.", "", "", "",
+    5465, "Microsoft-Windows-Security-Auditing", "PAStore Engine received a control for forced reloading of IPsec policy and processed the control successfully.", "", "", "",
+    5466, "Microsoft-Windows-Security-Auditing", "PAStore Engine polled for changes to the Active Directory IPsec policy.", "", "", "",
+    5467, "Microsoft-Windows-Security-Auditing", "PAStore Engine polled for changes to the Active Directory IPsec policy.", "", "", "",
+    5468, "Microsoft-Windows-Security-Auditing", "PAStore Engine polled for changes to the Active Directory IPsec policy.", "", "", "",
+    5471, "Microsoft-Windows-Security-Auditing", "PAStore Engine loaded local storage IPsec policy on the computer.", "", "", "",
+    5472, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to load local storage IPsec policy on the computer.", "", "", "",
+    5473, "Microsoft-Windows-Security-Auditing", "PAStore Engine loaded directory storage IPsec policy on the computer.", "", "", "",
+    5474, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to load directory storage IPsec policy on the computer.", "", "", "",
+    5477, "Microsoft-Windows-Security-Auditing", "PAStore Engine failed to add quick mode filter.", "", "", "",
+    6144, "Microsoft-Windows-Security-Auditing", "Security policy in the group policy objects has been applied successfully.", "", "", "",
+    6145, "Microsoft-Windows-Security-Auditing", "One or more errors occurred while processing security policy in the group policy objects.", "", "", "",
+    //---------- Object Access Events ----------
+    4656, "Microsoft-Windows-Security-Auditing", "A handle to an object was requested.", "", "", "",
+    4657, "Microsoft-Windows-Security-Auditing", "A registry value was modified.", "", "", "",
+    4658, "Microsoft-Windows-Security-Auditing", "The handle to an object was closed.", "", "", "",
+    4659, "Microsoft-Windows-Security-Auditing", "A handle to an object was requested with intent to delete.", "", "", "",
+    4659, "Microsoft-Windows-Security-Auditing", "A handle to an object was requested with intent to delete.", "", "", "",
+    4660, "Microsoft-Windows-Security-Auditing", "An object was deleted.", "", "", "",
+    4660, "Microsoft-Windows-Security-Auditing", "An object was deleted.", "", "", "",
+    4661, "Microsoft-Windows-Security-Auditing", "A handle to an object was requested.", "", "", "",
+    4661, "Microsoft-Windows-Security-Auditing", "A handle to an object was requested.", "", "", "",
+    4663, "Microsoft-Windows-Security-Auditing", "An attempt was made to access an object.", "", "", "",
+    4663, "Microsoft-Windows-Security-Auditing", "An attempt was made to access an object.", "", "", "",
+    4664, "Microsoft-Windows-Security-Auditing", "An attempt was made to create a hard link.", "", "", "",
+    4665, "Microsoft-Windows-Security-Auditing", "An attempt was made to create an application client context.", "", "", "",
+    4666, "Microsoft-Windows-Security-Auditing", "An application attempted an operation:", "", "", "",
+    4667, "Microsoft-Windows-Security-Auditing", "An application client context was deleted.", "", "", "",
+    4668, "Microsoft-Windows-Security-Auditing", "An application was initialized.", "", "", "",
+    4671, "Microsoft-Windows-Security-Auditing", "An application attempted to access a blocked ordinal through the TBS.", "", "", "",
+    4690, "Microsoft-Windows-Security-Auditing", "An attempt was made to duplicate a handle to an object.", "", "", "",
+    4691, "Microsoft-Windows-Security-Auditing", "Indirect access to an object was requested.", "", "", "",
+    4698, "Microsoft-Windows-Security-Auditing", "A scheduled task was created.", "", "", "",
+    4699, "Microsoft-Windows-Security-Auditing", "A scheduled task was deleted.", "", "", "",
+    4700, "Microsoft-Windows-Security-Auditing", "A scheduled task was enabled.", "", "", "",
+    4701, "Microsoft-Windows-Security-Auditing", "A scheduled task was disabled.", "", "", "",
+    4702, "Microsoft-Windows-Security-Auditing", "A scheduled task was updated.", "", "", "",
+    4818, "Microsoft-Windows-Security-Auditing", "Proposed Central Access Policy does not grant the same access permissions as the current Central Access Policy", "", "", "",
+    4868, "Microsoft-Windows-Security-Auditing", "The certificate manager denied a pending certificate request.", "", "", "",
+    4869, "Microsoft-Windows-Security-Auditing", "Certificate Services received a resubmitted certificate request.", "", "", "",
+    4870, "Microsoft-Windows-Security-Auditing", "Certificate Services revoked a certificate.", "", "", "",
+    4871, "Microsoft-Windows-Security-Auditing", "Certificate Services received a request to publish the certificate revocation list (CRL).", "", "", "",
+    4872, "Microsoft-Windows-Security-Auditing", "Certificate Services published the certificate revocation list (CRL).", "", "", "",
+    4873, "Microsoft-Windows-Security-Auditing", "A certificate request extension changed.", "", "", "",
+    4874, "Microsoft-Windows-Security-Auditing", "One or more certificate request attributes changed.", "", "", "",
+    4875, "Microsoft-Windows-Security-Auditing", "Certificate Services received a request to shut down.", "", "", "",
+    4876, "Microsoft-Windows-Security-Auditing", "Certificate Services backup started.", "", "", "",
+    4877, "Microsoft-Windows-Security-Auditing", "Certificate Services backup completed.", "", "", "",
+    4878, "Microsoft-Windows-Security-Auditing", "Certificate Services restore started.", "", "", "",
+    4879, "Microsoft-Windows-Security-Auditing", "Certificate Services restore completed.", "", "", "",
+    4880, "Microsoft-Windows-Security-Auditing", "Certificate Services started.", "", "", "",
+    4881, "Microsoft-Windows-Security-Auditing", "Certificate Services stopped.", "", "", "",
+    4882, "Microsoft-Windows-Security-Auditing", "The security permissions for Certificate Services changed.", "", "", "",
+    4883, "Microsoft-Windows-Security-Auditing", "Certificate Services retrieved an archived key.", "", "", "",
+    4884, "Microsoft-Windows-Security-Auditing", "Certificate Services imported a certificate into its database.", "", "", "",
+    4885, "Microsoft-Windows-Security-Auditing", "The audit filter for Certificate Services changed.", "", "", "",
+    4886, "Microsoft-Windows-Security-Auditing", "Certificate Services received a certificate request.", "", "", "",
+    4887, "Microsoft-Windows-Security-Auditing", "Certificate Services approved a certificate request and issued a certificate.", "", "", "",
+    4888, "Microsoft-Windows-Security-Auditing", "Certificate Services denied a certificate request.", "", "", "",
+    4889, "Microsoft-Windows-Security-Auditing", "Certificate Services set the status of a certificate request to pending.", "", "", "",
+    4890, "Microsoft-Windows-Security-Auditing", "The certificate manager settings for Certificate Services changed.", "", "", "",
+    4891, "Microsoft-Windows-Security-Auditing", "A configuration entry changed in Certificate Services.", "", "", "",
+    4892, "Microsoft-Windows-Security-Auditing", "A property of Certificate Services changed.", "", "", "",
+    4893, "Microsoft-Windows-Security-Auditing", "Certificate Services archived a key.", "", "", "",
+    4894, "Microsoft-Windows-Security-Auditing", "Certificate Services imported and archived a key.", "", "", "",
+    4895, "Microsoft-Windows-Security-Auditing", "Certificate Services published the CA certificate to Active Directory Domain Services.", "", "", "",
+    4896, "Microsoft-Windows-Security-Auditing", "One or more rows have been deleted from the certificate database.", "", "", "",
+    4897, "Microsoft-Windows-Security-Auditing", "Role separation enabled:", "", "", "",
+    4898, "Microsoft-Windows-Security-Auditing", "Certificate Services loaded a template.", "", "", "",
+    4899, "Microsoft-Windows-Security-Auditing", "A Certificate Services template was updated.", "", "", "",
+    4900, "Microsoft-Windows-Security-Auditing", "Certificate Services template security was updated.", "", "", "",
+    4985, "Microsoft-Windows-Security-Auditing", "The state of a transaction has changed.", "", "", "",
+    5031, "Microsoft-Windows-Security-Auditing", "The Windows Firewall Service blocked an application from accepting incoming connections on the network.", "", "", "",
+    5039, "Microsoft-Windows-Security-Auditing", "A registry key was virtualized.", "", "", "",
+    5051, "Microsoft-Windows-Security-Auditing", "A file was virtualized.", "", "", "",
+    5120, "Microsoft-Windows-Security-Auditing", "OCSP Responder Service Started.", "", "", "",
+    5121, "Microsoft-Windows-Security-Auditing", "OCSP Responder Service Stopped.", "", "", "",
+    5122, "Microsoft-Windows-Security-Auditing", "A Configuration entry changed in the OCSP Responder Service.", "", "", "",
+    5123, "Microsoft-Windows-Security-Auditing", "A configuration entry changed in the OCSP Responder Service.", "", "", "",
+    5124, "Microsoft-Windows-Security-Auditing", "A security setting was updated on OCSP Responder Service.", "", "", "",
+    5125, "Microsoft-Windows-Security-Auditing", "A request was submitted to OCSP Responder Service.", "", "", "",
+    5126, "Microsoft-Windows-Security-Auditing", "Signing Certificate was automatically updated by the OCSP Responder Service.", "", "", "",
+    5127, "Microsoft-Windows-Security-Auditing", "The OCSP Revocation Provider successfully updated the revocation information.", "", "", "",
+    5140, "Microsoft-Windows-Security-Auditing", "A network share object was accessed.", "", "", "",
+    5142, "Microsoft-Windows-Security-Auditing", "A network share object was added.", "", "", "",
+    5143, "Microsoft-Windows-Security-Auditing", "A network share object was modified.", "", "", "",
+    5144, "Microsoft-Windows-Security-Auditing", "A network share object was deleted.", "", "", "",
+    5145, "Microsoft-Windows-Security-Auditing", "A network share object was checked to see whether the client can be granted desired access.", "", "", "",
+    5146, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has blocked a packet.", "", "", "",
+    5147, "Microsoft-Windows-Security-Auditing", "A more restrictive Windows Filtering Platform filter has blocked a packet.", "", "", "",
+    5148, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has detected a DoS attack and entered a defensive mode; packets associated with this attack will be discarded.", "", "", "",
+    5149, "Microsoft-Windows-Security-Auditing", "The DoS attack has subsided and normal processing is being resumed.", "", "", "",
+    5150, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has blocked a packet.", "", "", "",
+    5151, "Microsoft-Windows-Security-Auditing", "A more restrictive Windows Filtering Platform filter has blocked a packet.", "", "", "",
+    5152, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform blocked a packet.", "", "", "",
+    5153, "Microsoft-Windows-Security-Auditing", "A more restrictive Windows Filtering Platform filter has blocked a packet.", "", "", "",
+    5154, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has permitted an application or service to listen on a port for incoming connections.", "", "", "",
+    5155, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has blocked an application or service from listening on a port for incoming connections.", "", "", "",
+    5156, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has allowed a connection.", "", "", "",
+    5157, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has blocked a connection.", "", "", "",
+    5158, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has permitted a bind to a local port.", "", "", "",
+    5159, "Microsoft-Windows-Security-Auditing", "The Windows Filtering Platform has blocked a bind to a local port.", "", "", "",
+    5168, "Microsoft-Windows-Security-Auditing", "Spn check for SMB/SMB2 failed.", "", "", "",
+    5888, "Microsoft-Windows-Security-Auditing", "An object in the COM+ Catalog was modified.", "", "", "",
+    5889, "Microsoft-Windows-Security-Auditing", "An object was deleted from the COM+ Catalog.", "", "", "",
+    5890, "Microsoft-Windows-Security-Auditing", "An object was added to the COM+ Catalog.", "", "", "",
+    //---------- Logon/Logoff Events ----------
+    4624, "Microsoft-Windows-Security-Auditing", "An account was successfully logged on.", "", "", "",
+    4625, "Microsoft-Windows-Security-Auditing", "An account failed to log on.", "", "", "",
+    4626, "Microsoft-Windows-Security-Auditing", "User/Device claims information.", "", "", "",
+    4627, "Microsoft-Windows-Security-Auditing", "Group membership information.", "", "", "",
+    4634, "Microsoft-Windows-Security-Auditing", "An account was logged off.", "", "", "",
+    4646, "Microsoft-Windows-Security-Auditing", "%1", "", "", "",
+    4647, "Microsoft-Windows-Security-Auditing", "User initiated logoff.", "", "", "",
+    4648, "Microsoft-Windows-Security-Auditing", "A logon was attempted using explicit credentials.", "", "", "",
+    4649, "Microsoft-Windows-Security-Auditing", "A replay attack was detected.", "", "", "",
+    4650, "Microsoft-Windows-Security-Auditing", "An IPsec Main Mode security association was established. Certificate authentication was not used.", "", "", "",
+    4651, "Microsoft-Windows-Security-Auditing", "An IPsec Main Mode security association was established. A certificate was used for authentication.", "", "", "",
+    4652, "Microsoft-Windows-Security-Auditing", "An IPsec Main Mode negotiation failed.", "", "", "",
+    4653, "Microsoft-Windows-Security-Auditing", "An IPsec Main Mode negotiation failed.", "", "", "",
+    4654, "Microsoft-Windows-Security-Auditing", "An IPsec Quick Mode negotiation failed.", "", "", "",
+    4655, "Microsoft-Windows-Security-Auditing", "An IPsec Main Mode security association ended.", "", "", "",
+    4675, "Microsoft-Windows-Security-Auditing", "SIDs were filtered.", "", "", "",
+    4778, "Microsoft-Windows-Security-Auditing", "A session was reconnected to a Window Station.", "", "", "",
+    4779, "Microsoft-Windows-Security-Auditing", "A session was disconnected from a Window Station.", "", "", "",
+    4800, "Microsoft-Windows-Security-Auditing", "The workstation was locked.", "", "", "",
+    4801, "Microsoft-Windows-Security-Auditing", "The workstation was unlocked.", "", "", "",
+    4802, "Microsoft-Windows-Security-Auditing", "The screen saver was invoked.", "", "", "",
+    4803, "Microsoft-Windows-Security-Auditing", "The screen saver was dismissed.", "", "", "",
+    4825, "Microsoft-Windows-Security-Auditing", "A user was denied the access to Remote Desktop.", "", "", "",
+    4964, "Microsoft-Windows-Security-Auditing", "Special groups have been assigned to a new logon.", "", "", "",
+    4976, "Microsoft-Windows-Security-Auditing", "During Main Mode negotiation, IPsec received an invalid negotiation packet.", "", "", "",
+    4977, "Microsoft-Windows-Security-Auditing", "During Quick Mode negotiation, IPsec received an invalid negotiation packet.", "", "", "",
+    4978, "Microsoft-Windows-Security-Auditing", "During Extended Mode negotiation, IPsec received an invalid negotiation packet.", "", "", "",
+    4979, "Microsoft-Windows-Security-Auditing", "IPsec Main Mode and Extended Mode security associations were established.", "", "", "",
+    4980, "Microsoft-Windows-Security-Auditing", "IPsec Main Mode and Extended Mode security associations were established.", "", "", "",
+    4981, "Microsoft-Windows-Security-Auditing", "IPsec Main Mode and Extended Mode security associations were established.", "", "", "",
+    4982, "Microsoft-Windows-Security-Auditing", "IPsec Main Mode and Extended Mode security associations were established.", "", "", "",
+    4983, "Microsoft-Windows-Security-Auditing", "An IPsec Extended Mode negotiation failed. The corresponding Main Mode security association has been deleted.", "", "", "",
+    4984, "Microsoft-Windows-Security-Auditing", "An IPsec Extended Mode negotiation failed. The corresponding Main Mode security association has been deleted.", "", "", "",
+    5049, "Microsoft-Windows-Security-Auditing", "An IPsec Security Association was deleted.", "", "", "",
+    5378, "Microsoft-Windows-Security-Auditing", "The requested credentials delegation was disallowed by policy.", "", "", "",
+    5451, "Microsoft-Windows-Security-Auditing", "An IPsec Quick Mode security association was established.", "", "", "",
+    5452, "Microsoft-Windows-Security-Auditing", "An IPsec Quick Mode security association ended.", "", "", "",
+    5453, "Microsoft-Windows-Security-Auditing", "An IPsec negotiation with a remote computer failed because the IKE and AuthIP IPsec Keying Modules (IKEEXT) service is not started.", "", "", "",
+    5632, "Microsoft-Windows-Security-Auditing", "A request was made to authenticate to a wireless network.", "", "", "",
+    5633, "Microsoft-Windows-Security-Auditing", "A request was made to authenticate to a wired network.", "", "", "",
+    6272, "Microsoft-Windows-Security-Auditing", "Network Policy Server granted access to a user.", "", "", "",
+    6273, "Microsoft-Windows-Security-Auditing", "Network Policy Server denied access to a user.", "", "", "",
+    6274, "Microsoft-Windows-Security-Auditing", "Network Policy Server discarded the request for a user.", "", "", "",
+    6275, "Microsoft-Windows-Security-Auditing", "Network Policy Server discarded the accounting request for a user.", "", "", "",
+    6276, "Microsoft-Windows-Security-Auditing", "Network Policy Server quarantined a user.", "", "", "",
+    6277, "Microsoft-Windows-Security-Auditing", "Network Policy Server granted access to a user but put it on probation because the host did not meet the defined health policy.", "", "", "",
+    6278, "Microsoft-Windows-Security-Auditing", "Network Policy Server granted full access to a user because the host met the defined health policy.", "", "", "",
+    6279, "Microsoft-Windows-Security-Auditing", "Network Policy Server locked the user account due to repeated failed authentication attempts.", "", "", "",
+    6280, "Microsoft-Windows-Security-Auditing", "Network Policy Server unlocked the user account.", "", "", "",
+    //---------- DS Access Events ----------
+    4662, "Microsoft-Windows-Security-Auditing", "An operation was performed on an object.", "", "", "",
+    4928, "Microsoft-Windows-Security-Auditing", "An Active Directory replica source naming context was established.", "", "", "",
+    4929, "Microsoft-Windows-Security-Auditing", "An Active Directory replica source naming context was removed.", "", "", "",
+    4930, "Microsoft-Windows-Security-Auditing", "An Active Directory replica source naming context was modified.", "", "", "",
+    4931, "Microsoft-Windows-Security-Auditing", "An Active Directory replica destination naming context was modified.", "", "", "",
+    4932, "Microsoft-Windows-Security-Auditing", "Synchronization of a replica of an Active Directory naming context has begun.", "", "", "",
+    4933, "Microsoft-Windows-Security-Auditing", "Synchronization of a replica of an Active Directory naming context has ended.", "", "", "",
+    4934, "Microsoft-Windows-Security-Auditing", "Attributes of an Active Directory object were replicated.", "", "", "",
+    4935, "Microsoft-Windows-Security-Auditing", "Replication failure begins.", "", "", "",
+    4936, "Microsoft-Windows-Security-Auditing", "Replication failure ends.", "", "", "",
+    4937, "Microsoft-Windows-Security-Auditing", "A lingering object was removed from a replica.", "", "", "",
+    5136, "Microsoft-Windows-Security-Auditing", "A directory service object was modified.", "", "", "",
+    5137, "Microsoft-Windows-Security-Auditing", "A directory service object was created.", "", "", "",
+    5138, "Microsoft-Windows-Security-Auditing", "A directory service object was undeleted.", "", "", "",
+    5139, "Microsoft-Windows-Security-Auditing", "A directory service object was moved.", "", "", "",
+    5141, "Microsoft-Windows-Security-Auditing", "A directory service object was deleted.", "", "", "",
+    5169, "Microsoft-Windows-Security-Auditing", "A directory service object was modified.", "", "", "",
+    //---------- Detailed Tracking Events ----------
+    4688, "Microsoft-Windows-Security-Auditing", "A new process has been created.", "", "", "",
+    4689, "Microsoft-Windows-Security-Auditing", "A process has exited.", "", "", "",
+    4692, "Microsoft-Windows-Security-Auditing", "Backup of data protection master key was attempted.", "", "", "",
+    4693, "Microsoft-Windows-Security-Auditing", "Recovery of data protection master key was attempted.", "", "", "",
+    4694, "Microsoft-Windows-Security-Auditing", "Protection of auditable protected data was attempted.", "", "", "",
+    4695, "Microsoft-Windows-Security-Auditing", "Unprotection of auditable protected data was attempted.", "", "", "",
+    4696, "Microsoft-Windows-Security-Auditing", "A primary token was assigned to process.", "", "", "",
+    5712, "Microsoft-Windows-Security-Auditing", "A Remote Procedure Call (RPC) was attempted.", "", "", "",
+    //---------- Account Management Events ----------
+    4720, "Microsoft-Windows-Security-Auditing", "A user account was created.", "", "", "",
+    4722, "Microsoft-Windows-Security-Auditing", "A user account was enabled.", "", "", "",
+    4723, "Microsoft-Windows-Security-Auditing", "An attempt was made to change an account's password.", "", "", "",
+    4724, "Microsoft-Windows-Security-Auditing", "An attempt was made to reset an account's password.", "", "", "",
+    4725, "Microsoft-Windows-Security-Auditing", "A user account was disabled.", "", "", "",
+    4726, "Microsoft-Windows-Security-Auditing", "A user account was deleted.", "", "", "",
+    4727, "Microsoft-Windows-Security-Auditing", "A security-enabled global group was created.", "", "", "",
+    4728, "Microsoft-Windows-Security-Auditing", "A member was added to a security-enabled global group.", "", "", "",
+    4729, "Microsoft-Windows-Security-Auditing", "A member was removed from a security-enabled global group.", "", "", "",
+    4730, "Microsoft-Windows-Security-Auditing", "A security-enabled global group was deleted.", "", "", "",
+    4731, "Microsoft-Windows-Security-Auditing", "A security-enabled local group was created.", "", "", "",
+    4732, "Microsoft-Windows-Security-Auditing", "A member was added to a security-enabled local group.", "", "", "",
+    4733, "Microsoft-Windows-Security-Auditing", "A member was removed from a security-enabled local group.", "", "", "",
+    4734, "Microsoft-Windows-Security-Auditing", "A security-enabled local group was deleted.", "", "", "",
+    4735, "Microsoft-Windows-Security-Auditing", "A security-enabled local group was changed.", "", "", "",
+    4737, "Microsoft-Windows-Security-Auditing", "A security-enabled global group was changed.", "", "", "",
+    4738, "Microsoft-Windows-Security-Auditing", "A user account was changed.", "", "", "",
+    4740, "Microsoft-Windows-Security-Auditing", "A user account was locked out.", "", "", "",
+    4742, "Microsoft-Windows-Security-Auditing", "A computer account was changed.", "", "", "",
+    4743, "Microsoft-Windows-Security-Auditing", "A computer account was deleted.", "", "", "",
+    4744, "Microsoft-Windows-Security-Auditing", "A security-disabled local group was created.", "", "", "",
+    4745, "Microsoft-Windows-Security-Auditing", "A security-disabled local group was changed.", "", "", "",
+    4746, "Microsoft-Windows-Security-Auditing", "A member was added to a security-disabled local group.", "", "", "",
+    4747, "Microsoft-Windows-Security-Auditing", "A member was removed from a security-disabled local group.", "", "", "",
+    4748, "Microsoft-Windows-Security-Auditing", "A security-disabled local group was deleted.", "", "", "",
+    4749, "Microsoft-Windows-Security-Auditing", "A security-disabled global group was created.", "", "", "",
+    4750, "Microsoft-Windows-Security-Auditing", "A security-disabled global group was changed.", "", "", "",
+    4751, "Microsoft-Windows-Security-Auditing", "A member was added to a security-disabled global group.", "", "", "",
+    4752, "Microsoft-Windows-Security-Auditing", "A member was removed from a security-disabled global group.", "", "", "",
+    4753, "Microsoft-Windows-Security-Auditing", "A security-disabled global group was deleted.", "", "", "",
+    4754, "Microsoft-Windows-Security-Auditing", "A security-enabled universal group was created.", "", "", "",
+    4755, "Microsoft-Windows-Security-Auditing", "A security-enabled universal group was changed.", "", "", "",
+    4756, "Microsoft-Windows-Security-Auditing", "A member was added to a security-enabled universal group.", "", "", "",
+    4757, "Microsoft-Windows-Security-Auditing", "A member was removed from a security-enabled universal group.", "", "", "",
+    4758, "Microsoft-Windows-Security-Auditing", "A security-enabled universal group was deleted.", "", "", "",
+    4759, "Microsoft-Windows-Security-Auditing", "A security-disabled universal group was created.", "", "", "",
+    4760, "Microsoft-Windows-Security-Auditing", "A security-disabled universal group was changed.", "", "", "",
+    4761, "Microsoft-Windows-Security-Auditing", "A member was added to a security-disabled universal group.", "", "", "",
+    4762, "Microsoft-Windows-Security-Auditing", "A member was removed from a security-disabled universal group.", "", "", "",
+    4764, "Microsoft-Windows-Security-Auditing", "A groups type was changed.", "", "", "",
+    4765, "Microsoft-Windows-Security-Auditing", "SID History was added to an account.", "", "", "",
+    4766, "Microsoft-Windows-Security-Auditing", "An attempt to add SID History to an account failed.", "", "", "",
+    4767, "Microsoft-Windows-Security-Auditing", "A user account was unlocked.", "", "", "",
+    4780, "Microsoft-Windows-Security-Auditing", "The ACL was set on accounts which are members of administrators groups.", "", "", "",
+    4781, "Microsoft-Windows-Security-Auditing", "The name of an account was changed:", "", "", "",
+    4782, "Microsoft-Windows-Security-Auditing", "The password hash an account was accessed.", "", "", "",
+    4783, "Microsoft-Windows-Security-Auditing", "A basic application group was created.", "", "", "",
+    4784, "Microsoft-Windows-Security-Auditing", "A basic application group was changed.", "", "", "",
+    4785, "Microsoft-Windows-Security-Auditing", "A member was added to a basic application group.", "", "", "",
+    4786, "Microsoft-Windows-Security-Auditing", "A member was removed from a basic application group.", "", "", "",
+    4787, "Microsoft-Windows-Security-Auditing", "A non-member was added to a basic application group.", "", "", "",
+    4788, "Microsoft-Windows-Security-Auditing", "A non-member was removed from a basic application group.", "", "", "",
+    4789, "Microsoft-Windows-Security-Auditing", "A basic application group was deleted.", "", "", "",
+    4790, "Microsoft-Windows-Security-Auditing", "An LDAP query group was created.", "", "", "",
+    4791, "Microsoft-Windows-Security-Auditing", "A basic application group was changed.", "", "", "",
+    4792, "Microsoft-Windows-Security-Auditing", "An LDAP query group was deleted.", "", "", "",
+    4793, "Microsoft-Windows-Security-Auditing", "The Password Policy Checking API was called.", "", "", "",
+    4794, "Microsoft-Windows-Security-Auditing", "An attempt was made to set the Directory Services Restore Mode.", "", "", "",
+    4797, "Microsoft-Windows-Security-Auditing", "An attempt was made to query the existence of a blank password for an account.", "", "", "",
+    4798, "Microsoft-Windows-Security-Auditing", "A user's local group membership was enumerated.", "", "", "",
+    4799, "Microsoft-Windows-Security-Auditing", "A security-enabled local group membership was enumerated.", "", "", "",
+    5376, "Microsoft-Windows-Security-Auditing", "Credential Manager credentials were backed up.", "", "", "",
+    5377, "Microsoft-Windows-Security-Auditing", "Credential Manager credentials were restored from a backup.", "", "", "",
+    //---------- Account Logon Events ----------
+    4768, "Microsoft-Windows-Security-Auditing", "A Kerberos authentication ticket (TGT) was requested.", "", "", "",
+    4769, "Microsoft-Windows-Security-Auditing", "A Kerberos service ticket was requested.", "", "", "",
+    4770, "Microsoft-Windows-Security-Auditing", "A Kerberos service ticket was renewed.", "", "", "",
+    4771, "Microsoft-Windows-Security-Auditing", "Kerberos pre-authentication failed.", "", "", "",
+    4772, "Microsoft-Windows-Security-Auditing", "A Kerberos authentication ticket request failed.", "", "", "",
+    4773, "Microsoft-Windows-Security-Auditing", "A Kerberos service ticket request failed.", "", "", "",
+    4774, "Microsoft-Windows-Security-Auditing", "An account was mapped for logon.", "", "", "",
+    4775, "Microsoft-Windows-Security-Auditing", "An account could not be mapped for logon.", "", "", "",
+    4776, "Microsoft-Windows-Security-Auditing", "The domain controller attempted to validate the credentials for an account.", "", "", "",
+    4777, "Microsoft-Windows-Security-Auditing", "The domain controller failed to validate the credentials for an account.", "", "", "",
+    4820, "Microsoft-Windows-Security-Auditing", "A Kerberos Ticket-granting-ticket (TGT) was denied because the device does not meet the access control restrictions.", "", "", "",
+    4821, "Microsoft-Windows-Security-Auditing", "A Kerberos service ticket was denied because the user, device, or both does not meet the access control restrictions.", "", "", "",
+    4822, "Microsoft-Windows-Security-Auditing", "NTLM authentication failed because the account was a member of the Protected User group.", "", "", "",
+    4823, "Microsoft-Windows-Security-Auditing", "NTLM authentication failed because access control restrictions are required.", "", "", "",
+    4824, "Microsoft-Windows-Security-Auditing", "Kerberos preauthentication by using DES or RC4 failed because the account was a member of the Protected User group.", "", "", ""
+];
+let BaselineSecEvent = view() { SecurityEvent
+| extend Timestamp = TimeGenerated
+| where TimeGenerated between (StartTime .. EndTime)
+| lookup kind=leftouter MITR3Associations on EventID, EventSourceName
+| extend MITR3Association = coalesce(strcat(TechniqueID, ": ", TechniqueName), "N/A"),
+         AdditionalInformation = iff(isnotempty(Tactic), pack_array(strcat("Tactic: ", Tactic)), dynamic([]))
+| extend Computer = tostring(split(Computer,".")[0])
+| where (array_length(SpecifiedSystem) == 0 or Computer in~ (SpecifiedSystem))
+    and (array_length(ExcludedSystem) == 0 or not(Computer has_any (ExcludedSystem)))
+| parse EventData with *'SubjectUserName">'SubjectUserName'</Data>'*
+| parse EventData with *'TargetUserName">'TargetUserName'</Data>'*
+| parse EventData with *'<Data Name="User">'User'</Data>'*
+| extend UnifiedAccount = coalesce(SubjectUserName, TargetUserName,
+    iff(SubjectAccount contains "\\", tostring(split(SubjectAccount, "\\")[1]), SubjectAccount),
+    iff(Account contains "\\", tostring(split(Account, "\\")[1]), Account),
+    iff(User contains "\\", tostring(split(User, "\\")[1]), User))
+| extend UnifiedAccount = iff(isnotempty(Account), tostring(split(Account,"\\")[1]), UnifiedAccount)
+| where (array_length(SpecifiedUser) == 0 or UnifiedAccount in~ (SpecifiedUser))
+    and (array_length(ExcludedUser) == 0 or not(UnifiedAccount has_any (ExcludedUser)))
+| where (array_length(MITR3Search) == 0 or TechniqueID in~ (MITR3Search))
+    and (array_length(MITR3Exclusion) == 0 or not(TechniqueID has_any (MITR3Exclusion)))};
+let FileOrObjectAccessEvents = materialize ( BaselineSecEvent
+| where "FileAccess" in~ (EventType)
+| where (EventID in (2,6,7,11,12,13,14,15,17,23,24,28)
+    and EventSourceName contains "Microsoft-Windows-Sysmon")
+     or (EventID in (4662,4663,4656,4670,4691,4715,4907,4659,4660,4661,4674,4690,4913,4934,4937,5136,5137,5138,5139,5141)
+      and EventSourceName contains "Microsoft-Windows-Security-Auditing")
+| parse EventData with *'<Data Name="Hashes">'Hashes'</Data>'*
+| extend ParsedHashes = split(Hashes, ",")
+| extend SHA256  = ParsedHashes[2], IMPHASH = ParsedHashes[3]
+| extend HashInfo = 
+    iff((isnotempty(SHA256)  and isnotempty(IMPHASH)), strcat(SHA256,", ",IMPHASH),
+    iff((isnotempty(SHA256)  and isempty(IMPHASH)), SHA256,
+    iff((isnotempty(IMPHASH) and isempty(SHA256)), IMPHASH, @"N\A"))),
+    TacticInfo = iff(isnotempty(Tactic), strcat("Tactic: ", Tactic), "")
+| extend AdditionalInformation = case(
+        isnotempty(HashInfo) and isnotempty(TacticInfo), pack_array(TacticInfo, HashInfo),
+        isnotempty(TacticInfo), pack_array(TacticInfo),
+        isnotempty(HashInfo), pack_array(HashInfo),
+        dynamic([]))
+| extend Better4662 =
+    strcat('<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '  <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '  <Data Name="Keywords">',Keywords,'</Data>\n'
+           '  <Data Name="SystemProcessID">',SystemProcessId,'</Data>\n'
+           '  <Data Name="ThreadID">',SystemThreadId,'</Data>\n'
+           '  <Data Name="Computer">',Computer,'</Data>\n'
+           '  <Data Name="SubjectUser SID">',SubjectUserSid,'</Data>\n'
+           '  <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '  <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '  <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '  <Data Name="ObjectServer">',ObjectServer,'</Data>\n'
+           '  <Data Name="ObjectType">',ObjectType,'</Data>\n'
+           '  <Data Name="ObjectName">',ObjectName,'</Data>\n'
+           '  <Data Name="OperationType">',OperationType,'</Data>\n' 
+           '  <Data Name="HandleId">',HandleId,'</Data>\n'
+           '  <Data Name="AccessMask">',AccessMask,'</Data>\n' 
+           '  <Data Name="Properties">',Properties,'</Data>\n' 
+           '  <Data Name="AdditionalInfo">',AdditionalInfo,'</Data>\n'
+           '  <Data Name="AdditionalInfo2">',AdditionalInfo2,'</Data>\n'
+           '</EventData>')
+| extend EventData = iff(EventID == 4662, Better4662, EventData)
+| project Timestamp=TimeGenerated, Computer, Activity, UnifiedAccount, MITR3Association, AdditionalInformation, EventData);
+let LogonLogoff = materialize ( BaselineSecEvent
+| where "Logon/Logoff Events" in~ (EventType)
+| where EventID in (4624,4634,4627,4625,4648,5633,4800,4801,4647,5632,4779,4778,4802,4803)
+| extend Better4634 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+           '   <Data Name="TargetUserName">',TargetUserName,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="TargetLogonID">',TargetLogonId,'</Data>\n'
+           '   <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+           '   <Data Name="WorkstationName">',Computer,'</Data>\n'
+           '</EventData>')
+| extend Better4624 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="SubjectUser SID">',SubjectUserSid,'</Data>\n'
+           '   <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '   <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '   <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '   <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+           '   <Data Name="TargetUserName">',TargetUserName,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="TargetLogonID">',TargetLogonId,'</Data>\n'
+           '   <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+           '   <Data Name="LogonProcess">',LogonProcessName,'</Data>\n'
+           '   <Data Name="AuthenticationPackage">',AuthenticationPackageName,'</Data>\n'
+           '   <Data Name="WorkstationName">',Computer,'</Data>\n'
+           '   <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+           '   <Data Name="TransmittedServices">',TransmittedServices,'</Data>\n'
+           '   <Data Name="LmPackageName">',LmPackageName,'</Data>\n'
+           '   <Data Name="ProcessId">',ProcessId,'</Data>\n'
+           '   <Data Name="ProcessName">',ProcessName,'</Data>\n'
+           '   <Data Name="IpAddress">',IpAddress,'</Data>\n'
+           '   <Data Name="IpPort">',IpPort,'</Data>\n'
+           '</EventData>')
+| extend Better4625 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="Keywords">',Keywords,'</Data>\n'
+           '   <Data Name="SubjectUserSID">',SubjectUserSid,'</Data>\n'
+           '   <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '   <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '   <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '   <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+           '   <Data Name="TargetUserName">',TargetUserName,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="Status">',Status,'</Data>\n'
+           '   <Data Name="SubStatus">',SubStatus,'</Data>\n'
+           '   <Data Name="FailureReason">',FailureReason,'</Data>\n'
+           '   <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+           '   <Data Name="LogonProcess">',LogonProcessName,'</Data>\n'
+           '   <Data Name="AuthenticationPackage">',AuthenticationPackageName,'</Data>\n'
+           '   <Data Name="WorkstationName">',WorkstationName,'</Data>\n'
+           '   <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+           '   <Data Name="LmPackageName">',LmPackageName,'</Data>\n'
+           '   <Data Name="ProcessId">',ProcessId,'</Data>\n'
+           '   <Data Name="ProcessName">',ProcessName,'</Data>\n'
+           '   <Data Name="IpAddress">',IpAddress,'</Data>\n'
+           '   <Data Name="IpPort">',IpPort,'</Data>\n'
+           '</EventData>')
+| extend Better4648 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+           '   <Data Name="UtcTime">',TimeGenerated,'</Data>\n'
+           '   <Data Name="SubjectUserSID">',SubjectUserSid,'</Data>\n'
+           '   <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n'
+           '   <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+           '   <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n'
+           '   <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+           '   <Data Name="TargetUserName">',UnifiedAccount,'</Data>\n'
+           '   <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+           '   <Data Name="TargetLogonGuid">',TargetLogonGuid,'</Data>\n'
+           '   <Data Name="TargetServerName">',TargetServerName,'</Data>\n'
+           '   <Data Name="TargetInfo">',TargetInfo,'</Data>\n'
+           '   <Data Name="ProcessId">',ProcessId,'</Data>\n'
+           '   <Data Name="ProcessName">',ProcessName,'</Data>\n'
+           '   <Data Name="IpAddress">',IpAddress,'</Data>\n'
+           '   <Data Name="IpPort">',IpPort,'</Data>\n'
+           '</EventData>')
+| extend EventData =
+    iff(EventID == 4624, Better4624,
+    iff(EventID == 4648, Better4648,
+    iff(EventID == 4634, Better4634,
+    iff(EventID == 4625, Better4625,
+    EventData))))
+| project Timestamp=TimeGenerated, Computer, Activity, UnifiedAccount, EventData, AdditionalInformation, MITR3Association);
+let SystemSecEvents = materialize ( BaselineSecEvent
+| where "SystemSecEvent" in (EventType)
+| where EventID in (6417,5061,5058,5059,6416,4697,6420,6422,6419,6421,5025,6407,5038,5035,5478,4816,6281,5032,4965,5480,6408,5060,5057,6418,5037,6401,5030)
+| parse EventData with *'<Data Name="DeviceDescription">'DeviceDescription1'</Data>'*
+| parse EventData with *'<Data Name="DeviceId">'DeviceId1'</Data>'*
+| extend DevServInfo = 
+    iff(EventID == 6416, strcat('Id: ',DeviceId,' | Description: ',DeviceDescription),
+    iff(EventID == 4697, strcat('Account: ',ServiceAccount,' | ServiceFileName: ',ServiceFileName,' | Service: ',ServiceName),
+    iff(EventID in (6420,6422), strcat('Id: ',DeviceId1,' | Description: ',DeviceDescription1), @'N\A'))),
+    TacticInfo = iff(isnotempty(Tactic), strcat('Tactic: ', Tactic), '')
+| extend AdditionalInformation = case(
+    isnotempty(DevServInfo) and isnotempty(TacticInfo), pack_array(TacticInfo, DevServInfo),
+    isnotempty(TacticInfo), pack_array(TacticInfo),
+    isnotempty(DevServInfo), pack_array(DevServInfo),
+    dynamic([]))
+| project Timestamp=TimeGenerated, Computer, Activity, UnifiedAccount, MITR3Association, AdditionalInformation, EventData);
+// --- Initial Output Branch ---
+let FinalPreOutput = union FileOrObjectAccessEvents,LogonLogoff,SystemSecEvents
+| project-reorder
+    Timestamp,
+    Computer,
+    UnifiedAccount,
+    Activity,
+    MITR3Association,
+    AdditionalInformation,
+    EventData;
+// --- Variable Assignment to Determine Detail ---
+let outputMode = iif(array_length(Output_Detail) == 0, "Summarized", tostring(Output_Detail[0]));
+// --- Summarized Output Branch ---
+let SummarizedOutput = FinalPreOutput
+| where outputMode == "Summarized"
+| summarize
+    FirstSeen = min(Timestamp),
+    LastSeen = max(Timestamp),
+    EventData = make_set_if(EventData, isnotempty(EventData), 200),
+    AdditionalInformation = make_set_if(AdditionalInformation, isnotempty(AdditionalInformation))
+    by
+    Computer,
+    UnifiedAccount,
+    Activity,
+    MITR3Association
+| extend Timestamp = iff(FirstSeen == LastSeen, todynamic(tostring(FirstSeen)), pack("FirstSeen ", FirstSeen, "LastSeen ", LastSeen))
+| project-away FirstSeen, LastSeen
+| project-reorder
+    Timestamp,
+    Computer,
+    UnifiedAccount,
+    Activity,
+    MITR3Association,
+    AdditionalInformation,
+    EventData;
+// --- Detailed Output Branch ---
+let DetailedOutput = FinalPreOutput
+| where outputMode == "Detailed"
+| extend
+    FirstSeen = Timestamp,
+    LastSeen = Timestamp,
+    EventData = pack_array(EventData),
+    AdditionalInformation = pack_array(AdditionalInformation)
+| extend Timestamp = iff(FirstSeen == LastSeen, todynamic(tostring(FirstSeen)), pack("FirstSeen ", FirstSeen, "LastSeen ", LastSeen))
+| project-away FirstSeen, LastSeen
+| project-reorder
+    Timestamp,
+    Computer,
+    UnifiedAccount,
+    Activity,
+    MITR3Association,
+    AdditionalInformation,
+    EventData;
+union SummarizedOutput, DetailedOutput

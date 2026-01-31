@@ -1,0 +1,36 @@
+let TA0009Collection = materialize(datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string) [
+	  13  , "Microsoft-Windows-Sysmon", "RDP shadow session started (registry)", "T1125", "Video capture"
+]);
+let TA0011CommandAndControl = materialize(datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string) [
+	  4688, "Microsoft-Windows-Security-Auditing", "RDP tunneling configuration enabled for port forwarding", "T1572", "Protocol tunneling"
+	, 1   , "Microsoft-Windows-Sysmon", "RDP tunneling configuration enabled for port forwarding", "T1572", "Protocol tunneling"
+	, 5600, "Microsoft-Windows-WinINet-Config", "Proxy configuration changed", "T1090", "Proxy"
+]);
+let TA0040Impact = materialize(datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string) [
+	  4103, "Microsoft-Windows-PowerShell", "VSS backup deletion (PowerShell)", "T1490", "Inhibit System Recovery"
+	, 4104, "Microsoft-Windows-PowerShell", "VSS backup deletion (PowerShell)", "T1490", "Inhibit System Recovery"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Windows native backup deletion", "T1490", "Inhibit System Recovery"
+	, 4688, "Microsoft-Windows-Security-Auditing", "VSS backup deletion (WMI)", "T1490", "Inhibit System Recovery"
+	, 1   , "Microsoft-Windows-Sysmon", "VSS backup deletion (WMI)", "T1490", "Inhibit System Recovery"
+	, 1   , "Microsoft-Windows-Sysmon", "Windows native backup deletion", "T1490", "Inhibit System Recovery"
+	, 11  , "Microsoft-Windows-Sysmon", "DNS hosts file modified", "T1565", "Data manipulation"
+	, 800 , "PowerShell", "VSS backup deletion (PowerShell)", "T1490", "Inhibit System Recovery"
+]);
+let TA0009Events = materialize ( SecurityEvent
+| lookup kind=leftouter TA0009Collection on EventID, EventSourceName
+| where EventID == 13 and EventSourceName contains "Microsoft-Windows-Sysmon"
+| parse EventData with *'<Data Name="TargetObject">'RegPath'</Data>'*
+| parse EventData with *'<Data Name="Details">'SetValue'</Data>'*
+| parse EventData with *'<Data Name="Image">'Image'</Data>'*
+| where RegPath contains @"Terminal Services\Shadow" and not(SetValue contains "DWORD (0x00000000)")
+| extend StatusInformation13 = bag_pack("Initiating Process",Image,"Registry Object",RegPath,"Modified Value",SetValue)
+| extend MITREAssociation = coalesce(strcat(TechniqueID,": ",TechniqueName, " | ",Description),"N/A"),
+         AdditionalInformation = iff(EventID==13, StatusInformation13,dynamic([]))
+| project Timestamp=TimeGenerated,Computer,Account,Activity,MITREAssociation,AdditionalInformation,EventData);
+let TA0011Events = materialize ( SecurityEvent
+| lookup kind=leftouter TA0011CommandAndControl on EventID, EventSourceName
+| where EventID == 1 and EventSourceName contains "Microsoft-Windows-Sysmon"
+     or EventID == 4688 and EventSourceName contains "Microsoft-Windows-Security-Auditing"
+     or EventID == 5600 and EventSourceName contains "Microsoft-Windows-WinINet-Config"
+| parse EventData with *'<Data Name="CommandLine">'CmdLine'</Data>'*
+| extend IOCMatch = iff(EventID == 1 and CmdLine contains "-L", CmdLine, "N/A")

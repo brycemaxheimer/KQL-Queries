@@ -1,0 +1,205 @@
+let SpecifiedSystem = dynamic([]);
+let ExcludedSystem  = dynamic([]);
+let SpecifiedUser   = dynamic([]);
+let ExcludedUser    = dynamic([]);
+let StartTime       = datetime();
+let EndTime         = datetime();
+let TA0004PrivilegeEscalation = materialize(datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string,Tactic:string) [
+	4673, "Microsoft-Windows-Security-Auditing", "Exploitation for Privilege Escalation", "T1068", "Privilege SeMachineAccountPrivilege abuse", "TA0004-Privilege Escalation"
+	, 4624, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: Token Impersonation/Theft", "T1134.001", "Anonymous login", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: Token Impersonation/Theft", "T1134.001", "Anonymous login", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: Create Process with Token", "T1134.002", "Privilege escalation via runas (command)", "TA0004-Privilege Escalation"
+	, 4648, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: Create Process with Token", "T1134.002", "Privilege escalation via runas (command)", "TA0004-Privilege Escalation"
+	, 4624, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: Create Process with Token", "T1134.002", "Privilege escalation via runas (command)", "TA0004-Privilege Escalation"
+	, 1,    "Microsoft-Windows-Sysmon", "Access Token Manipulation: Create Process with Token", "T1134.002", "Privilege escalation via RunasCS", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: Create Process with Token", "T1134.002", "Privilege escalation via RunasCS", "TA0004-Privilege Escalation"
+	, 4675, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: SID-History Injection", "T1134.005", "SID history value S/F to be added to a domain account", "TA0004-Privilege Escalation"
+	, 4766, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: SID-History Injection", "T1134.005", "SID history value S/F to be added to a domain account", "TA0004-Privilege Escalation"
+	, 4738, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation: SID-History Injection", "T1134.005", "SID history value S/F to be added to a domain account", "TA0004-Privilege Escalation"
+	, 4717, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation", "T1134", "New access rights granted to an account by a standard user", "TA0004-Privilege Escalation"
+	, 4718, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation", "T1134", "New access rights granted to an account by a standard user", "TA0004-Privilege Escalation"
+	, 4704, "Microsoft-Windows-Security-Auditing", "Access Token Manipulation", "T1134", "User right granted to an account by a standard user", "TA0004-Privilege Escalation"
+	, 5136, "Microsoft-Windows-Security-Auditing", "Domain Policy Modification-Group Policy Modification", "T1484.001", "Modification of a sensitive Group Policy", "TA0004-Privilege Escalation"
+	, 4865, "Microsoft-Windows-Security-Auditing", "Domain or Tenant Policy Modification: Trust Modification", "T1484.002", "New external trust added", "TA0004-Privilege Escalation"
+	, 4076, "Microsoft-Windows-Security-Auditing", "Domain or Tenant Policy Modification: Trust Modification", "T1484.002", "New external trust added", "TA0004-Privilege Escalation"
+	, 7045, "Microsoft-Windows-Security-Auditing", "Create or Modify System Process-Windows Service", "T1543.003", "PSexec service installation detected", "TA0004-Privilege Escalation"
+	, 4697, "Microsoft-Windows-Security-Auditing", "Create or Modify System Process-Windows Service", "T1543.003", "PSexec service installation detected", "TA0004-Privilege Escalation"
+	, 1,    "Microsoft-Windows-Sysmon", "Event Triggered Execution: Accessibility Features", "T1546.008", "CMD executed by sticky key and detected via hash", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Event Triggered Execution: Accessibility Features", "T1546.008", "CMD executed by sticky key and detected via hash", "TA0004-Privilege Escalation"
+	, 1,    "Microsoft-Windows-Sysmon", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key called CMD via command execution", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key called CMD via command execution", "TA0004-Privilege Escalation"
+	, 4656, "Microsoft-Windows-Security-Auditing", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key failed sethc replacement by CMD", "TA0004-Privilege Escalation"
+	, 11,   "Microsoft-Windows-Sysmon", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key file created from CMD copy", "TA0004-Privilege Escalation"
+	, 1,    "Microsoft-Windows-Sysmon", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key IFEO command for registry change", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key IFEO command for registry change", "TA0004-Privilege Escalation"
+	, 12,   "Microsoft-Windows-Sysmon", "Event Triggered Execution: Accessibility Features", "T1546.008", "Sticky key IFEO registry changed", "TA0004-Privilege Escalation"
+	, 800,  "Microsoft-Windows-Security-Auditing", "Port Monitors", "T1547.010", "Print spooler privilege escalation via printer added", "TA0004-Privilege Escalation"
+	, 4103, "Microsoft-Windows-Security-Auditing", "Port Monitors", "T1547.010", "Print spooler privilege escalation via printer added", "TA0004-Privilege Escalation"
+	, 4104, "Microsoft-Windows-Security-Auditing", "Port Monitors", "T1547.010", "Print spooler privilege escalation via printer added", "TA0004-Privilege Escalation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "External printer mapped", "TA0004-Privilege Escalation"
+	, 4648, "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "External printer mapped", "TA0004-Privilege Escalation"
+	, 6416, "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "New external device added", "TA0004-Privilege Escalation"
+	, 808,  "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "Printer spool driver from Mimikatz installed", "TA0004-Privilege Escalation"
+	, 354,  "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "Printer spool driver from Mimikatz installed", "TA0004-Privilege Escalation"
+	, 321,  "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "Printer spool driver from Mimikatz installed", "TA0004-Privilege Escalation"
+	, 1,    "Microsoft-Windows-Sysmon", "DLL Side-Loading", "T1574.002", "Spool process spawned a CMD shell",	"TA0004-Privilege Escalation"
+    , 4688, "Microsoft-Windows-Security-Auditing", "DLL Side-Loading", "T1574.002", "Spool process spawned a CMD shell", "TA0004-Privilege Escalation"
+]);
+let AccessMaskAttr = materialize(datatable(AccessCode:string,AccessType:string) [
+    "%%4416", "ReadData/ListDirectory/QueryKeyValue"
+    , "%%4417", "WriteData/AddFile/SetKeyValue"
+    , "%%4418", "AppendData/AddSubdirectory/CreatePipeInstance"
+    , "%%4419", "ReadEA/EnumerateSub-Keys"
+    , "%%4420", "WriteEA"
+    , "%%4421", "Execute/Traverse"
+    , "%%4422", "DeleteChild"
+    , "%%4423", "ReadAttributes"
+    , "%%4424", "WriteAttributes"
+    , "%%1537", "DELETE"
+    , "%%1538", "READ_CONTROL"
+    , "%%1539", "WRITE_DAC"
+    , "%%1540", "WRITE_OWNER"
+    , "%%1541", "SYNCHRONIZE"
+    , "%%1542", "ACCESS_SYS_SEC"
+]);
+let PrivilegeListDefinitions = materialize(datatable(PrivilegeCode:string,PrivilegeFunction:string) [
+    "SeAssignPrimaryTokenPrivilege",     "Replace a process-level token"
+    , "SeAuditPrivilege",                "Generate security audits"
+    , "SeBackupPrivilege",               "Back up files and directories"
+    , "SeChangeNotifyPrivilege",         "Bypass traverse checking"
+    , "SeCreateGlobalPrivilege",         "Create global objects"
+    , "SeCreatePagefilePrivilege",       "Create a pagefile"
+    , "SeCreatePermanentPrivilege",      "Create permanent shared objects"
+    , "SeCreateSymbolicLinkPrivilege",   "Create symbolic links"
+    , "SeCreateTokenPrivilege",          "Create a token object"
+    , "SeDebugPrivilege",                "Debug programs"
+    , "SeEnableDelegationPrivilege",     "Enable computer and user accounts to be trusted for delegation"
+    , "SeImpersonatePrivilege",          "Impersonate a client after authentication"
+    , "SeIncreaseBasePriorityPrivilege", "Increase scheduling priority"
+    , "SeIncreaseQuotaPrivilege",        "Adjust memory quotas for a process"
+    , "SeIncreaseWorkingSetPrivilege",   "Increase a process working set"
+    , "SeLoadDriverPrivilege",           "Load and unload device drivers"
+    , "SeLockMemoryPrivilege",           "Lock pages in memory"
+    , "SeMachineAccountPrivilege",       "Add workstations to domain"
+    , "SeManageVolumePrivilege",         "Perform volume maintenance tasks"
+    , "SeProfileSingleProcessPrivilege", "Profile single process"
+    , "SeRelabelPrivilege",              "Modify an object label"
+    , "SeRemoteShutdownPrivilege",       "Force shutdown from a remote system"
+    , "SeRestorePrivilege",              "Restore files and directories"
+    , "SeSecurityPrivilege",             "Manage auditing and security log"
+    , "SeShutdownPrivilege",             "Shut down the system"
+    , "SeSyncAgentPrivilege",            "Synchronize directory service data"
+    , "SeSystemEnvironmentPrivilege",    "Modify firmware environment values"
+    , "SeSystemProfilePrivilege",        "Profile system performance"
+    , "SeSystemtimePrivilege",           "Change the system time"
+    , "SeTakeOwnershipPrivilege",        "Take ownership of files or other objects"
+    , "SeTcbPrivilege",                  "Act as part of the operating system"
+    , "SeTimeZonePrivilege",             "Change the time zone"
+    , "SeTrustedCredManAccessPrivilege", "Access Credential Manager as a trusted caller"
+    , "SeUndockPrivilege",               "Remove computer from docking station"
+    , "SeUnsolicitedInputPrivilege",     "Not applicable"
+]);
+let TA0004Events = materialize ( SecurityEvent
+| where TimeGenerated >ago(24h)
+| extend Computer = tostring(split(Computer,".")[0])
+| where (array_length(SpecifiedSystem) == 0 or Computer in~ (SpecifiedSystem))
+    and (array_length(ExcludedSystem) == 0 or not(Computer has_any (ExcludedSystem)))
+| parse EventData with *'SubjectUserName">'SubjectUserName'</Data>'*
+| parse EventData with *'TargetUserName">'TargetUserName'</Data>'*
+| parse EventData with *'<Data Name="User">'User'</Data>'*
+| extend UnifiedAccount = coalesce(SubjectUserName, TargetUserName,
+    iff(SubjectAccount contains "\\", tostring(split(SubjectAccount, "\\")[1]), SubjectAccount),
+    iff(Account contains "\\", tostring(split(Account, "\\")[1]), Account),
+    iff(User contains "\\", tostring(split(User, "\\")[1]), User))
+| extend UnifiedAccount = iff(isnotempty(Account), tostring(split(Account,"\\")[1]), UnifiedAccount)
+| where (array_length(SpecifiedUser) == 0 or UnifiedAccount in~ (SpecifiedUser))
+    and (array_length(ExcludedUser) == 0 or not(UnifiedAccount has_any (ExcludedUser)))
+| lookup kind=leftouter TA0004PrivilegeEscalation on EventID, EventSourceName
+| where EventID in (4673,4624,4688,4648,4675,4766,4717,4738,4718,4704,5136,4865,4076,4697,4656,6416,808,354,321)
+    and EventSourceName contains "Microsoft-Windows-Security-Auditing"
+    or  EventID in (800) and EventSourceName contains "PowerShell"
+    or  EventID in (7045) and EventSourceName contains "Service Control Manager"
+    or  EventID in (1,11,12) and EventSourceName contains "Microsoft-Windows-Sysmon"
+    or  EventID in (4103,4104) and EventSourceName contains "Microsoft-Windows-PowerShell"
+| parse EventData with *'<Data Name="Hashes">'Hashes'</Data>'*
+| parse EventData with *'<Data Name="Image">'FileCreatingProcess'</Data>'*
+| parse EventData with *'<Data Name="TargetFilename">'File'</Data>'*
+| parse EventData with *'<Data Name="CreationUtcTime">'FileCreationTime'</Data>'*
+| parse EventData with *'<Data Name="User">'FileCreator'</Data>'*
+| parse EventData with *'<Data Name="CommandLine">'CommandLine'</Data>'*
+| parse EventData with *'<Data Name="ObjectType">'ObjType'</Data>'*
+| parse EventData with *'<Data Name="ObjectName">'ObjName'</Data>'*
+| parse EventData with *'<Data Name="AccessList">'AccessList'</Data>'*
+| parse EventData with *'<Data Name="PrivilegeList">'PrivilegeName'</Data>'*
+| parse EventData with *'<Data Name="ProcessName">'HandleCreatingProcess'</Data>'*
+| extend PrivList = extract_all(@'(\w+)', tostring(PrivilegeName)),AccList = extract_all(@'(%%\d+)', tostring(AccessList))
+| extend ParsedHashes = split(Hashes, ",")
+| extend SHA256   = ParsedHashes[2], IMPHASH = ParsedHashes[3]
+| extend HashInfo = 
+    iff((isnotempty(SHA256)  and isnotempty(IMPHASH)), strcat(SHA256,", ",IMPHASH),
+    iff((isnotempty(SHA256)  and isempty(IMPHASH)), SHA256,
+    iff((isnotempty(IMPHASH) and isempty(SHA256)), IMPHASH, "N/A"))), ""
+| extend Better4688 = 
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+'  <Data Name="UtcTime">',TimeGenerated,'</Data>\n''  <Data Name="ProcessId">',NewProcessId,'</Data>\n'
+'  <Data Name="Image">',NewProcessName,'</Data>\n''  <Data Name="CommandLine">',CommandLine,'</Data>\n'
+'  <Data Name="User">',TargetAccount,'</Data>\n''  <Data Name="LogonId">',TargetLogonId,'</Data>\n'
+'  <Data Name="UserName">',TargetUserName,'</Data>\n''  <Data Name="ParentProcessId">',ProcessId,'</Data>\n'
+'  <Data Name="ParentImage">',ParentProcessName,'</Data>\n''  <Data Name="ParentUser">',SubjectAccount,'</Data>\n'
+'  <Data Name="AccountType">',AccountType,'</Data>\n''</EventData>')
+| extend Better4624 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+'  <Data Name="UtcTime">',TimeGenerated,'</Data>\n''  <Data Name="SubjectUser SID">',SubjectUserSid,'</Data>\n'
+'  <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n''  <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+'  <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n''  <Data Name="TargetUserSID">',TargetUserSid,'</Data>\n'
+'  <Data Name="TargetUserName">',TargetUserName,'</Data>\n''  <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+'  <Data Name="TargetLogonID">',TargetLogonId,'</Data>\n''  <Data Name="LogonType">',LogonTypeName,'</Data>\n'
+'  <Data Name="LogonProcess">',LogonProcessName,'</Data>\n''  <Data Name="AuthenticationPackage">',AuthenticationPackageName,'</Data>\n'
+'  <Data Name="WorkstationName">',Computer,'</Data>\n''  <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+'  <Data Name="LmPackageName">',LmPackageName,'</Data>\n''  <Data Name="ProcessId">',ProcessId,'</Data>\n'
+'  <Data Name="ProcessName">',ProcessName,'</Data>\n''  <Data Name="IpAddress">',IpAddress,'</Data>\n'
+'  <Data Name="IpPort">',IpPort,'</Data>\n''</EventData>')
+| extend Better4648 =
+    strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+'  <Data Name="UtcTime">',TimeGenerated,'</Data>\n''  <Data Name="SubjectUserSID">',SubjectUserSid,'</Data>\n'
+'  <Data Name="SubjectUserName">',SubjectUserName,'</Data>\n''  <Data Name="SubjectDomainName">',SubjectDomainName,'</Data>\n'
+'  <Data Name="SubjectLogonID">',SubjectLogonId,'</Data>\n''  <Data Name="LogonGuid">',LogonGuid,'</Data>\n'
+'  <Data Name="TargetUserName">',TargetUserName,'</Data>\n''  <Data Name="TargetDomainName">',TargetDomainName,'</Data>\n'
+'  <Data Name="TargetLogonGuid">',TargetLogonGuid,'</Data>\n''  <Data Name="TargetServerName">',TargetServerName,'</Data>\n'
+'  <Data Name="TargetInfo">',TargetInfo,'</Data>\n''  <Data Name="ProcessId">',ProcessId,'</Data>\n'
+'  <Data Name="ProcessName">',ProcessName,'</Data>\n''  <Data Name="IpAddress">',IpAddress,'</Data>\n'
+'  <Data Name="IpPort">',IpPort,'</Data>\n''</EventData>')
+| extend EventData = iff(EventID == 4688, Better4688,
+                     iff(EventID == 4624, Better4624,
+                     iff(EventID == 4648, Better4648, EventData)))
+| extend row_id=new_guid());
+let MappedAccessTypes_table = TA0004Events
+| where EventID == 4656 and array_length(AccList) > 0
+| mv-expand AccList_item = AccList to typeof(string)
+| join kind=leftouter AccessMaskAttr on $left.AccList_item == $right.AccessCode
+| summarize MappedAccessTypes = make_set(AccessType) by row_id;
+let MappedPrivilegeTypes_table = TA0004Events
+| where EventID == 4656 and array_length(PrivList) > 0
+| mv-expand PrivList_item = PrivList to typeof(string)
+| join kind=leftouter PrivilegeListDefinitions on $left.PrivList_item == $right.PrivilegeCode
+| summarize MappedPrivilegeTypes = make_set(PrivilegeFunction) by row_id;
+TA0004Events
+| join kind=leftouter MappedAccessTypes_table on row_id
+| join kind=leftouter MappedPrivilegeTypes_table on row_id
+| extend StatusInformation4624 = iff(EventID == 4624,bag_pack("LogonType",LogonType,"LogonProcess",LogonProcessName),dynamic([])),
+         StatusInformation11   = iff(EventID == 11,  bag_pack("New File", File,"File Creator",FileCreator,"Creating Process",
+                                                     FileCreatingProcess,"Creation Time",FileCreationTime),dynamic([])),
+         StatusInformation4688 = iff(EventID == 4688,bag_pack("Parent Process",ParentProcessName,"New Process",NewProcessName,
+                                                     "Parent User",SubjectUserName),dynamic([])),
+         StatusInformation4656 = iff(EventID == 4656,bag_pack("Parent Process",HandleCreatingProcess,"Object Type",ObjType,"Object Name",ObjName,
+                                                     "Access List",AccList,"Access Type",MappedAccessTypes,"Privilege List",PrivList,
+                                                     "Privilege Function",MappedPrivilegeTypes),dynamic([]))
+| extend MITREAssociation = coalesce(strcat(TechniqueID,": ",TechniqueName, " | ",Description),"N/A"),
+         AdditionalInformation = iff(EventID==1,HashInfo,
+                                 iff(EventID==4624,StatusInformation4624,
+                                 iff(EventID==4688,StatusInformation4688,
+                                 iff(EventID==4656,StatusInformation4656,
+                                 iff(EventID==11,StatusInformation11,dynamic([]))))))
+| project Timestamp=TimeGenerated,Computer,UnifiedAccount,Activity,MITREAssociation,AdditionalInformation,EventData
+| where Activity contains "4656"
+| take 10

@@ -201,5 +201,3 @@ TA0004Events
                                  iff(EventID==4656,StatusInformation4656,
                                  iff(EventID==11,StatusInformation11,dynamic([]))))))
 | project Timestamp=TimeGenerated,Computer,UnifiedAccount,Activity,MITREAssociation,AdditionalInformation,EventData
-| where Activity contains "4656"
-| take 10

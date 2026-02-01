@@ -1,4 +1,4 @@
-# Kusto Query Language (KQL) Security Analysis Engine
+# MITRE Association Query
 
 ## 1. Purpose
 

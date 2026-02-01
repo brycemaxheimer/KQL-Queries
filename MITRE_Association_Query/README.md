@@ -1,75 +1,35 @@
-# KQL Unified Security Event Analysis Query
-## Overview
-This is an advanced Kusto Query Language (KQL) query designed to provide a unified and enriched view of security events from multiple sources within a Microsoft Sentinel environment. Its primary purpose is to normalize disparate log formats, particularly from Windows Security Auditing and Sysmon, into a single, consistent schema. The query is architected for modularity and scalability, allowing analysts to select and combine different event types for analysis without modifying the core query logic.
+# Kusto Query Language (KQL) Security Analysis Engine
 
-## Features
-Unified Schema: Ingests and normalizes logs from different sources (SecurityEvent, Sysmon) into a single, predictable table structure.
+## 1. Purpose
 
-Centralized Filtering: User-defined filters for time, systems, and accounts are configured in a single location and applied efficiently at the base of the query.
+This document describes a Kusto Query Language (KQL) script designed to analyze Windows security event data. The primary function of the query is to identify, categorize, and report on system activities that may indicate security threats. It processes raw log data and organizes it according to the MITRE ATT&CK framework, a globally accessible knowledge base of adversary tactics and techniques.
 
-MITRE ATT&CK Enrichment: Automatically enriches events with corresponding MITRE ATT&CK Technique IDs, names, and tactics by cross-referencing a built-in datatable.
+## 2. Core Functionality
 
-Dynamic Event Selection: Allows the analyst to specify which types of events to include in the query result (e.g., SystemAccess, FileAccess) through a single configuration variable.
+The query operates by performing a sequence of steps to transform complex event logs into understandable security insights.
 
-Modular Architecture: The query is broken into logical, self-contained blocks for each event type, making it easy to maintain, debug, and extend with new event types in the future.
+### 2.1. User Configuration
 
-Robust Account Normalization: Intelligently parses account names from multiple potential fields (User, TargetUserName, SubjectUserName, Account) to create a single, reliable UnifiedAccount column, correctly handling both DOMAIN\User and standalone user formats.
+The script begins with a configuration section where an analyst can define the scope of the investigation. The primary inputs include:
+*   **Time Range:** The start and end times for the data analysis.
+*   **Target Systems and Users:** Specific computers or user accounts to either include or exclude from the search.
+*   **Event Type:** The specific categories of adversary tactics to investigate, based on the MITRE ATT&CK framework.
+*   **Output Detail:** A selection that determines if the final report should be a high-level summary or a detailed list of all individual events.
 
-## Architecture
-The query is designed using a multi-stage, modular pattern to ensure efficiency and maintainability.
+### 2.2. Data Processing
 
-Configuration Block: At the top of the query, a series of let statements define all user-configurable parameters. This is the only section an analyst needs to interact with for day-to-day use.
+After configuration, the query executes its main logic in three phases.
 
-MITR3Associations Datatable: A static datatable serves as a lookup dictionary to map combinations of EventID and EventSourceName to their corresponding MITRE ATT&CK framework details.
+1.  **Event Filtering:** The query first selects a baseline of relevant events from the total set of security logs based on the specified time range, users, and systems.
 
-BaselineSecEvent View: This is the core of the query. It performs the initial data pull from the SecurityEvent table and applies all foundational filtering and enrichment.
+2.  **Contextual Enrichment:** It enriches this raw data with additional context. The script maintains internal lookup tables to translate non-descriptive codes from the event logs into human-readable information.
 
-Filters by time range.
+3.  **Threat Categorization:** The query categorizes each relevant event according to its corresponding tactic and technique within the MITRE ATT&CK framework. It contains dedicated logic for different tactics.
 
-Enriches events by performing a lookup against the MITR3Associations table.
+## 3. Output
 
-Filters by specified and excluded systems.
+The final output of the query is a structured table of security-relevant activities. The user can select one of two output formats:
 
-Performs the crucial account normalization using coalesce() to create the UnifiedAccount field.
+*   **Summarized View:** This mode groups together related events to provide a high-level overview. It shows what activity occurred, where it occurred, and the time range of the occurrences, preventing information overload by consolidating thousands of events into a few lines.
 
-Filters by specified and excluded users based on the normalized UnifiedAccount.
-
-Event-Specific Modules (let blocks): The query is divided into modular let statements, one for each EventType (e.g., FileOrObjectAccessEvents, SystemAccess).
-
-Each module begins by filtering for its specific EventType, ensuring it only runs when selected by the user.
-
-It then performs parsing and data manipulation specific to its event IDs.
-
-It concludes by projecting a standardized set of columns to ensure its schema is compatible with all other modules.
-
-union and project-reorder: The final stage unions the results from the executed modules and uses project-reorder to enforce a final, consistent column order for the output.
-
-## Configuration
-To use the query, modify the let statements in the top section.
-
-EventType: A dynamic array specifying which modules to run (e.g., ["FileAccess", "SystemAccess"]).
-
-SpecifiedSystem: A dynamic array of hostnames to include. An empty array [] includes all systems.
-
-ExcludedSystem: A dynamic array of hostnames to exclude.
-
-SpecifiedUser: A dynamic array of user accounts to include. An empty array [] includes all users.
-
-ExcludedUser: A dynamic array of user accounts to exclude. Supports partial matching (e.g., "$" for machine accounts, "svc" for service accounts).
-
-StartTime: The start of the query time range.
-
-EndTime: The end of the query time range.
-
-## Output Schema
-The query produces a table with the following standardized columns:
-
-| Column | Data Type | Description |
-|--------|-----------|-------------|
-| TimeGenerated	| datetime | The timestamp of the event. |
-| Computer | string | The name of the host where the event occurred. |
-| UnifiedAccount | string | The normalized user or system account associated with the event. |
-| EventID | int | The Windows Event ID. |
-| AdditionalInformation | dynamic | An array containing context-specific data, such as file hashes or MITRE ATT&CK tactics. |
-| MITR3Association | string | The associated MITRE ATT&CK Technique ID and name. |
-| EventData | string | The original, raw event data, potentially reconstructed for clarity. |
+*   **Detailed View:** This mode provides an unabridged list of every single event that matched the search criteria, complete with its full event data. This is useful for in-depth forensic analysis where every detail is required.

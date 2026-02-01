@@ -2,11 +2,11 @@
 
 ## 1. Purpose
 
-This document describes a Kusto Query Language (KQL) script designed to analyze Windows security event data. The primary function of the query is to identify, categorize, and report on system activities that may indicate security threats. It processes raw log data and organizes it according to the MITRE ATT&CK framework, a globally accessible knowledge base of adversary tactics and techniques.
+The primary function of the query is to identify, categorize, and report on system activities that may indicate security threats. It processes raw log data and organizes it according to the MITRE ATT&CK framework.
 
 ## 2. Core Functionality
 
-The query operates by performing a sequence of steps to transform complex event logs into understandable security insights.
+The query operates by performing a sequence of steps to transform event logs into understandable security insights.
 
 ### 2.1. User Configuration
 

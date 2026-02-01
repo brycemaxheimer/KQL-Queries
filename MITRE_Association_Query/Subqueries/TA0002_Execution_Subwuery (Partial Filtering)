@@ -1,0 +1,106 @@
+let SpecifiedSystem = dynamic([]); let ExcludedSystem  = dynamic([]);
+let SpecifiedUser   = dynamic([]); let ExcludedUser    = dynamic([]);
+let MITR3Search     = dynamic([]); let MITR3Exclusion  = dynamic([]);
+let Output_Detail   = dynamic([]);
+let StartTime       = datetime(2026-01-31, 00:00:00);
+let EndTime         = datetime(2026-02-01, 23:59:59);
+let TA0002Execution=materialize(datatable(EventID:int,EventSourceName:string,Description:string,TechniqueID:string,TechniqueName:string) [
+	4688, "Microsoft-Windows-Security-Auditing", "Impacket WMIexec process execution", "T1047", "Windows Management Instrumentation"
+	, 1   ,	"Microsoft-Windows-Sysmon", "Impacket WMIexec process execution", "T1047", "Windows Management Instrumentation"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Interactive shell triggered by scheduled task (at, deprecated)", "T1053.005", "Scheduled Task"
+	, 1   ,	"Microsoft-Windows-Sysmon", "Interactive shell triggered by scheduled task (at, deprecated)", "T1053.005", "Scheduled Task"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Persistent scheduled task with SYSTEM privileges creation", "T1053.005", "Scheduled Task"
+	, 1   , "Microsoft-Windows-Sysmon", "Persistent scheduled task with SYSTEM privileges creation", "T1053.005", "Scheduled Task"
+	, 5145, "Microsoft-Windows-Security-Auditing", "Remote schedule task creation via named pipes", "T1053.005", "Scheduled Task"
+	, 4698, "Microsoft-Windows-Security-Auditing", "Schedule task created with suspicious arguments", "T1053.005", "Scheduled Task"
+	, 4698, "Microsoft-Windows-Security-Auditing", "Schedule task fastly created and deleted", "T1053.005", "Scheduled Task"
+	, 4699, "Microsoft-Windows-Security-Auditing", "Schedule task fastly created and deleted", "T1053.005", "Scheduled Task"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Scheduled task creation", "T1053.005", "Scheduled Task"
+	, 1   ,	"Microsoft-Windows-Sysmon", "Scheduled task creation", "T1053.005", "Scheduled Task"
+	, 800 , "PowerShell", "Encoded PowerShell payload deployed", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4103, "Microsoft-Windows-PowerShell", "Encoded PowerShell payload deployed", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4104, "Microsoft-Windows-PowerShell", "Encoded PowerShell payload deployed", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 800 , "Microsoft-Windows-Security-Auditing", "Interactive PipeShell over SMB named pipe", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4103, "Microsoft-Windows-PowerShell", "Interactive PipeShell over SMB named pipe", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4104, "Microsoft-Windows-PowerShell", "Interactive PipeShell over SMB named pipe", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 800 , "PowerShell", "Payload downloaded via PowerShell", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4103, "Microsoft-Windows-PowerShell", "Payload downloaded via PowerShell", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4104, "Microsoft-Windows-PowerShell", "Payload downloaded via PowerShell", "T1059.001", "Command and Scripting Interpreter: PowerShell"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Encoded PowerShell payload deployed via process execution", "T1059.003", "Windows Command Shell"
+	, 1   ,	"Microsoft-Windows-Sysmon", "Encoded PowerShell payload deployed via process execution", "T1059.003", "Windows Command Shell"
+	, 4688, "Microsoft-Windows-Security-Auditing", "SQL Server payload injectection for reverse shell (MSF)", "T1059.003", "Windows Command Shell"
+	, 1   ,	"Microsoft-Windows-Sysmon", "SQL Server payload injectection for reverse shell (MSF)", "T1059.003", "Windows Command Shell"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Edge abuse for payload download via console", "T1204", "User execution"
+	, 1   ,	"Microsoft-Windows-Sysmon", "Edge abuse for payload download via console", "T1204", "User execution"
+	, 4688, "Microsoft-Windows-Security-Auditing", "Edge/Chrome headless feature abuse for payload download", "T1204", "User execution"
+	, 1   , "Microsoft-Windows-Sysmon", "Edge/Chrome headless feature abuse for payload download", "T1204", "User execution"
+	, 4688, "Microsoft-Windows-Security-Auditing", "PSexec installation detected", "T1569.002", "Service Execution"
+	, 1   , "Microsoft-Windows-Sysmon", "PSexec installation detected", "T1569.002", "Service Execution"
+	, 7000, "Service Control Manager", "Service massive failures (native)", "T1569.002", "Service Execution"
+	, 7009, "Service Control Manager", "Service massive failures (native)", "T1569.002", "Service Execution"
+	, 7045, "Service Control Manager", "Service massive installation (native)", "T1569.002", "Service Execution"
+	, 4697, "Microsoft-Windows-Security-Auditing", "Service massive installation (native)", "T1569.002", "Service Execution"
+	, 5145, "Microsoft-Windows-Security-Auditing", "Service massive remote creation via named pipes (native)", "T1569.002", "Service Execution"
+]);
+SecurityEvent
+| extend Timestamp=TimeGenerated
+| where TimeGenerated between (StartTime..EndTime)
+| extend Computer=tostring(split(Computer,".")[0])
+| where (array_length(SpecifiedSystem)==0 or Computer in~(SpecifiedSystem))
+    and (array_length(ExcludedSystem)==0 or not(Computer has_any(ExcludedSystem)))
+| parse EventData with *'SubjectUserName">'SubjectUserName'</Data>'*
+| parse EventData with *'TargetUserName">'TargetUserName'</Data>'*
+| parse EventData with *'<Data Name="User">'User'</Data>'*
+| extend UnifiedAccount = coalesce(SubjectUserName, TargetUserName,
+    iff(SubjectAccount contains "\\",tostring(split(SubjectAccount,"\\")[1]),SubjectAccount),
+    iff(Account contains "\\",tostring(split(Account,"\\")[1]),Account),
+    iff(User contains "\\",tostring(split(User,"\\")[1]),User))
+| extend UnifiedAccount=iff(isnotempty(Account), tostring(split(Account,"\\")[1]),UnifiedAccount)
+| where (array_length(SpecifiedUser)==0 or UnifiedAccount in~(SpecifiedUser))
+    and (array_length(ExcludedUser)==0 or not(UnifiedAccount has_any(ExcludedUser)))
+| lookup kind=leftouter TA0002Execution on EventID,EventSourceName
+| where EventID in(4688,5145,4698,4697) and EventSourceName contains "Microsoft-Windows-Security-Auditing"
+     or EventID in(7000,7009,7045) and EventSourceName contains "Service Control Manager"
+     or EventID in(4103,4104) and EventSourceName contains "Microsoft-Windows-PowerShell"
+     or EventID in(1) and EventSourceName contains "Microsoft-Windows-Sysmon"
+     or EventID in(800) and EventSourceName contains "PowerShell"
+| parse EventData with *'"ParentImage">'ParentProcessName1'</Data>'*
+| parse EventData with *'"Image">'NewProcessName1'</Data>'*
+| parse EventData with *'"UtcTime">'EventCreation'</Data>'*
+| extend Better4688=strcat('<EventData xmlns="http://schemas.microsoft.com/win/2004/08/events/event">\n'
+'  <Data Name="UtcTime">',TimeGenerated,'</Data>\n''  <Data Name="ProcessId">',NewProcessId,'</Data>\n'
+'  <Data Name="Image">',NewProcessName,'</Data>\n''  <Data Name="CommandLine">',CommandLine,'</Data>\n'
+'  <Data Name="User">',TargetAccount,'</Data>\n''  <Data Name="LogonId">',TargetLogonId,'</Data>\n'
+'  <Data Name="UserName">',TargetUserName,'</Data>\n''  <Data Name="ParentProcessId">',ProcessId,'</Data>\n'
+'  <Data Name="ParentImage">',ParentProcessName,'</Data>\n''  <Data Name="ParentUser">',SubjectAccount,'</Data>\n'
+'  <Data Name="AccountType">',AccountType,'</Data>\n''</EventData>')
+| extend EventData=iff(EventID==4688,Better4688,EventData)
+| extend ParentProcessName=iff(EventID==1,ParentProcessName1,ParentProcessName)
+        ,NewProcessName=iff(EventID==1,NewProcessName1,NewProcessName)
+| extend commandLine=tolower(CommandLine),NewProcessId=tolong(NewProcessId)
+        ,SysmonTime=todatetime(EventCreation)
+| extend ProcessMatch=case(
+    Description=="Impacket WMIexec process execution" and commandLine has_all("wmic","process","call","create"),true,
+    Description=="Interactive shell triggered by scheduled task (at, deprecated)" and commandLine has "at.exe",true,
+    Description=="Persistent scheduled task with SYSTEM privileges creation" and commandLine has_all("schtasks","/create","/sc","onstart","/ru","system"),true,
+    Description=="Scheduled task creation" and (commandLine has_all("schtasks","/create") and not(commandLine has_all("/sc","onstart","/ru","system"))),true,
+    Description=="Encoded PowerShell payload deployed via process execution" and commandLine has_any("-enc","JABl","SQBFAFgA"),true,
+    Description=="SQL Server payload injectection for reverse shell (MSF)" and commandLine has "xp_cmdshell",true,
+    Description=="Edge abuse for payload download via console" and commandLine has_all("msedge.exe","--headless"),true,
+    Description=="Edge/Chrome headless feature abuse for payload download" and (commandLine has_all("chrome.exe","--headless") or commandLine has_all("msedge.exe","--headless")),true,
+    Description=="PSexec installation detected" and (NewProcessName has "PSEXESVC.exe" or commandLine has "PSEXESVC.exe"),true,false)
+| where (EventID in(1,4688) and ProcessMatch==true)
+| extend StatusInformation1=iff(EventID==1,bag_pack("New Process",NewProcessName,"Parent Process",ParentProcessName,"Command Line",commandLine),dynamic([])),
+         StatusInformation4688=iff(EventID==4688,bag_pack("New Process",NewProcessName,"Parent Process",ParentProcessName,"Command Line",commandLine),dynamic([]))
+| extend MITREAssociation=coalesce(strcat(TechniqueID,": ",TechniqueName," | ",Description),"N/A"),
+         AdditionalInformation=iff(EventID==1,StatusInformation1,
+                               iff(EventID==4688,StatusInformation4688,dynamic([])))
+| summarize make_set_if(EventID,EventID in(1,4688)),Activity=make_set(Activity),EventData=make_set(EventData),UnifiedAccount=make_set(UnifiedAccount)
+         by Computer,MITREAssociation,tostring(AdditionalInformation),bin(TimeGenerated,3s)
+| extend EventData=iff(array_length(EventData)>1 and EventData[0] has "Hashes",EventData[0]
+                  ,iff(array_length(EventData)>1 and EventData[1] has "Hashes",EventData[1]
+                  ,iff(array_length(EventData)==1 and EventData[0] has "Hashes",EventData[0],EventData)))
+| parse EventData with *'"Hashes">'ParsedHashes'</Data>'*
+| extend AdditionalInformation=todynamic(AdditionalInformation),Hashes=strcat(split(ParsedHashes,",")[2],'\n',split(ParsedHashes,",")[3])
+| extend AdditionalInformation=AdditionalInformation,Hashes
+| project Timestamp=TimeGenerated,Computer,Activity,UnifiedAccount,MITREAssociation,AdditionalInformation,EventData

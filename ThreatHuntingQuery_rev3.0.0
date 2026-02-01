@@ -22,7 +22,7 @@ let EventType       = dynamic(["TA0004"]);
 //--------------------------Function Assignment--------------------------\\
 //-----------------------------------------------------------------------\\
 //--------------------------Variable Assignment--------------------------\\
-let SpecifiedSystem = dynamic(["CIN-FRT49R3SHD"]);
+let SpecifiedSystem = dynamic([]);
 let ExcludedSystem  = dynamic([]);
 let SpecifiedUser   = dynamic([]);
 let ExcludedUser    = dynamic([]);

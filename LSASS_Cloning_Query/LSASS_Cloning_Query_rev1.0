@@ -1,0 +1,42 @@
+let StartTime = datetime(2025-10-30, 12:00:00);
+let EndTime   = datetime(2025-11-03, 13:00:00);
+let SuspiciousLsassCreations = materialize (
+    union (
+        SecurityEvent
+        | where TimeGenerated between (StartTime .. EndTime)
+        | where EventSourceName has "Microsoft-Windows-Security-Auditing" and EventID == 4688
+        | where NewProcessName contains "lsass" and ParentProcessName !contains "wininit"
+        | project EventCreation = TimeGenerated, Computer, ParentProcess = ParentProcessName, LsassProcessId = tostring(NewProcessId)
+    ), (
+        SecurityEvent
+        | where TimeGenerated between (StartTime .. EndTime)
+        | where EventSourceName has "Microsoft-Windows-Sysmon" and EventID == 1
+        | extend ChildProcess = tostring(extract('<Data Name=("Image"|"TargetImage")>(.*?)</Data>', 2, EventData)),
+                 ParentProcess = tostring(extract('<Data Name=("ParentImage"|"SourceImage")>(.*?)</Data>', 2, EventData)),
+                 LsassProcessId = tostring(extract('<Data Name="ProcessId">(.*?)</Data>', 2, EventData))
+        | where ChildProcess contains "lsass" and not (ParentProcess has_any ("wininit", "Ingest Failure"))
+        | project EventCreation = TimeGenerated, Computer, ParentProcess, LsassProcessId
+    )
+);
+let RemoteThreadEvents = SecurityEvent
+    | where TimeGenerated between (StartTime .. EndTime)
+    | where EventSourceName has "Microsoft-Windows-Sysmon" and EventID == 8
+    | extend
+        InteractionTime = TimeGenerated,
+        TargetProcessId = tostring(extract('<Data Name="TargetProcessId">(.*?)</Data>', 1, EventData)),
+        SourceProcess = tostring(extract('<Data Name="SourceImage">(.*?)</Data>', 1, EventData))
+    | project InteractionTime, Computer, SourceProcess, TargetProcessId;
+SuspiciousLsassCreations
+| join kind=inner (
+    RemoteThreadEvents
+) on Computer
+| where TargetProcessId == LsassProcessId and InteractionTime > EventCreation
+| where InteractionTime < (EventCreation + 5m)
+| project
+    InitialLsassCreationTime = EventCreation,
+    Computer,
+    ParentOfLsass = ParentProcess,
+    LsassProcessId,
+    InteractionTime,
+    InteractionSource = SourceProcess
+| order by Computer, InitialLsassCreationTime, InteractionTime asc

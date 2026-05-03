@@ -1,0 +1,220 @@
+let Hostname  = "";
+let startTime = datetime();
+let endTime   = datetime();
+let KernelPowerEvents = SecurityEvent
+| where Computer has (Hostname)
+| where TimeGenerated between (startTime .. endTime)
+| where EventSourceName == "Microsoft-Windows-Kernel-Power"
+    and EventID in (42, 105, 107, 109, 172, 506, 507, 521, 566, 577, 40)
+| extend EventData_XML = parse_xml(EventData)
+| extend
+    // EID 42 - System entering sleep/shutdown
+    TargetState_42       = tostring(EventData_XML.EventData.Data[0]["#text"]),
+    EffectiveState_42    = tostring(EventData_XML.EventData.Data[1]["#text"]),
+    SleepReason_42       = tostring(EventData_XML.EventData.Data[2]["#text"]),
+    TransitionsToOn      = tostring(EventData_XML.EventData.Data[4]["#text"]),
+    // EID 105 - Power source / battery
+    AcOnline             = tostring(EventData_XML.EventData.Data[0]["#text"]),
+    RemainingCapacity    = tostring(EventData_XML.EventData.Data[1]["#text"]),
+    FullChargeCapacity   = tostring(EventData_XML.EventData.Data[2]["#text"]),
+    // EID 107 - Wake configuration
+    WakeFromState        = tostring(EventData_XML.EventData.Data[2]["#text"]),
+    // EID 109 - Shutdown initiated
+    ShutdownActionType   = tostring(EventData_XML.EventData.Data[0]["#text"]),
+    ShutdownEventCode    = tostring(EventData_XML.EventData.Data[1]["#text"]),
+    ShutdownReason_109   = tostring(EventData_XML.EventData.Data[2]["#text"]),
+    // EID 172 - Power state change
+    PowerState_172       = tostring(EventData_XML.EventData.Data[0]["#text"]),
+    PowerReason_172      = tostring(EventData_XML.EventData.Data[1]["#text"]),
+    // EID 506 - Connected Standby session enter (screen off)
+    CS_EnterReason       = tostring(EventData_XML.EventData.Data[0]["#text"]),
+    CS_BatteryOnEnter    = tostring(EventData_XML.EventData.Data[4]["#text"]),
+    CS_BootId_506        = tostring(EventData_XML.EventData.Data[7]["#text"]),
+    // EID 507 - Connected Standby session exit (screen on) — contains duration
+    CS_DurationUs        = tolong(EventData_XML.EventData.Data[5]["#text"]),
+    CS_ExitReason        = tostring(EventData_XML.EventData.Data[8]["#text"]),
+    CS_BootId_507        = tostring(EventData_XML.EventData.Data[25]["#text"]),
+    CS_ScreenOffDurUs    = tolong(EventData_XML.EventData.Data[36]["#text"]),
+    CS_SleepDurUs        = tolong(EventData_XML.EventData.Data[39]["#text"]),
+    CS_SleepEntered      = tostring(EventData_XML.EventData.Data[33]["#text"]),
+    // EID 566 - Session boundary transition (links previous/next sessions)
+    SB_BootId            = tostring(EventData_XML.EventData.Data[0]["#text"]),
+    SB_Reason            = tostring(EventData_XML.EventData.Data[1]["#text"]),
+    SB_PrevSessionId     = tostring(EventData_XML.EventData.Data[2]["#text"]),
+    SB_PrevSessionType   = tostring(EventData_XML.EventData.Data[3]["#text"]),
+    SB_PrevDurationUs    = tolong(EventData_XML.EventData.Data[4]["#text"]),
+    SB_NextSessionId     = tostring(EventData_XML.EventData.Data[8]["#text"]),
+    SB_NextSessionType   = tostring(EventData_XML.EventData.Data[9]["#text"]),
+    SB_PowerStateAc      = tostring(EventData_XML.EventData.Data[10]["#text"])
+| extend
+    EventDescription = case(
+        EventID == 42 and TargetState_42 == "4",  "System Entering Sleep (S4 Hibernate)",
+        EventID == 42 and TargetState_42 == "5",  "System Entering Shutdown (S5 Off)",
+        EventID == 42,                             strcat("System Power Transition → S", TargetState_42),
+        EventID == 105 and AcOnline == "true",     "Power Source: AC (Plugged In)",
+        EventID == 105 and AcOnline == "false",    "Power Source: Battery (DC)",
+        EventID == 105,                            "Power Source Status Update",
+        EventID == 107 and WakeFromState == "4",   "System Resumed from Hibernate (S4)",
+        EventID == 107 and WakeFromState == "5",   "System Resumed from Shutdown (S5 → Boot)",
+        EventID == 107,                            strcat("System Wake/Resume from S", WakeFromState),
+        EventID == 109 and ShutdownActionType == "5", "Shutdown Initiated (Power Off)",
+        EventID == 109 and ShutdownActionType == "4", "Shutdown Initiated (Hibernate)",
+        EventID == 109 and ShutdownActionType == "7", "Shutdown Initiated (Hybrid Shutdown)",
+        EventID == 109,                            strcat("Shutdown Initiated (Type ", ShutdownActionType, ")"),
+        EventID == 172 and PowerState_172 == "2",  "System Power State: Running (S0)",
+        EventID == 172 and PowerState_172 == "4",  "System Power State: Hibernate (S4)",
+        EventID == 172 and PowerState_172 == "5",  "System Power State: Off (S5)",
+        EventID == 172,                            strcat("Power State Change → S", PowerState_172),
+        EventID == 506,                            "Connected Standby Session Started (Screen Off)",
+        EventID == 507,                            "Connected Standby Session Ended (Screen On)",
+        EventID == 521,                            "Battery Enumeration Completed",
+        EventID == 566,                            "Power Session Boundary Transition",
+        EventID == 577,                            "Adaptive Standby Status Update",
+        EventID == 40,                             "ACPI Driver Power State Callback",
+        "Unknown Kernel-Power Event"
+    ),
+    PowerAction = case(
+        EventID == 107,                            "POWER_ON / WAKE",
+        EventID == 172 and PowerState_172 == "2",  "POWER_ON / WAKE",
+        EventID == 42  and TargetState_42 == "5",  "POWER_OFF",
+        EventID == 109,                            "POWER_OFF",
+        EventID == 42  and TargetState_42 == "4",  "SLEEP / HIBERNATE",
+        EventID == 506,                            "SLEEP / STANDBY",
+        EventID == 507,                            "WAKE / STANDBY_EXIT",
+        EventID == 566,                            "SESSION_TRANSITION",
+        EventID == 105,                            "POWER_SOURCE",
+        EventID == 172,                            "STATE_CHANGE",
+        "INFORMATIONAL"
+    );
+KernelPowerEvents
+| project
+    TimeGenerated,
+    Computer,
+    EventID,
+    PowerAction,
+    EventDescription,
+    // Conditional detail columns
+    Details = case(
+        EventID == 42,  strcat("Target=S", TargetState_42, " Effective=S", EffectiveState_42, " Reason=", SleepReason_42, " BootTransitions=", TransitionsToOn),
+        EventID == 105, strcat("AC=", AcOnline, " Remaining=", RemainingCapacity, "mWh Full=", FullChargeCapacity, "mWh"),
+        EventID == 107, strcat("WakeFrom=S", WakeFromState),
+        EventID == 109, strcat("Action=", ShutdownActionType, " EventCode=", ShutdownEventCode, " Reason=", ShutdownReason_109),
+        EventID == 172, strcat("State=S", PowerState_172, " Reason=", PowerReason_172),
+        EventID == 506, strcat("Reason=", CS_EnterReason, " BatteryOnEnter=", CS_BatteryOnEnter, "mWh BootId=", CS_BootId_506),
+        EventID == 507, strcat("Duration=", format_timespan(CS_DurationUs * 1tick, "d.hh:mm:ss"),
+                               " ScreenOffDur=", format_timespan(CS_ScreenOffDurUs * 1tick, "d.hh:mm:ss"),
+                               " SleepEntered=", CS_SleepEntered,
+                               " ExitReason=", CS_ExitReason,
+                               " BootId=", CS_BootId_507),
+        EventID == 566, strcat("BootId=", SB_BootId,
+                               " PrevSession=", SB_PrevSessionId, "(Type", SB_PrevSessionType, ")",
+                               " PrevDur=", format_timespan(SB_PrevDurationUs * 1tick, "d.hh:mm:ss"),
+                               " NextSession=", SB_NextSessionId, "(Type", SB_NextSessionType, ")",
+                               " AC=", SB_PowerStateAc),
+        ""
+    )
+| sort by TimeGenerated asc;
+let PowerOnOff = KernelPowerEvents
+| where PowerAction in ("POWER_ON / WAKE", "POWER_OFF", "SLEEP / HIBERNATE")
+| project TimeGenerated, Computer, EventID, PowerAction, EventDescription
+| sort by Computer asc, TimeGenerated asc
+| serialize
+| extend NextEvent      = next(PowerAction),
+         NextTime       = next(TimeGenerated),
+         NextEventID    = next(EventID),
+         NextDesc       = next(EventDescription),
+         NextComputer   = next(Computer)
+| where PowerAction == "POWER_ON / WAKE" and Computer == NextComputer
+        and NextEvent in ("POWER_OFF", "SLEEP / HIBERNATE")
+| extend UptimeDuration = NextTime - TimeGenerated
+| project
+    Computer,
+    PowerOnTime      = TimeGenerated,
+    PowerOnEventID   = EventID,
+    PowerOnDesc      = EventDescription,
+    PowerOffTime     = NextTime,
+    PowerOffEventID  = NextEventID,
+    PowerOffDesc     = NextDesc,
+    Uptime           = UptimeDuration,
+    UptimeFormatted  = strcat(
+        toint(UptimeDuration / 1d), "d ",
+        toint((UptimeDuration % 1d) / 1h), "h ",
+        toint((UptimeDuration % 1h) / 1m), "m ",
+        toint((UptimeDuration % 1m) / 1s), "s"
+    )
+| sort by PowerOnTime asc;
+PowerOnOff;
+KernelPowerEvents
+| where EventID == 507
+| extend
+    StandbyDuration    = format_timespan(CS_DurationUs * 1tick, "d.hh:mm:ss"),
+    ScreenOffDuration  = format_timespan(CS_ScreenOffDurUs * 1tick, "d.hh:mm:ss"),
+    SleepDuration      = format_timespan(CS_SleepDurUs * 1tick, "d.hh:mm:ss"),
+    SleepActuallyUsed  = iff(CS_SleepEntered == "true", "Yes", "No"),
+    ExitReason         = case(
+        CS_ExitReason == "12", "User Input",
+        CS_ExitReason == "20", "Lid Open",
+        CS_ExitReason == "31", "Power Button",
+        CS_ExitReason == "7",  "Timer/Scheduled",
+        strcat("Code ", CS_ExitReason)
+    )
+| project
+    TimeGenerated,
+    Computer,
+    StandbyDuration,
+    ScreenOffDuration,
+    SleepDuration,
+    SleepActuallyUsed,
+    ExitReason,
+    BootId = CS_BootId_507
+| sort by TimeGenerated asc;
+KernelPowerEvents
+| where EventID == 566
+| extend
+    PreviousSessionDuration = format_timespan(SB_PrevDurationUs * 1tick, "d.hh:mm:ss"),
+    PreviousSessionType = case(
+        SB_PrevSessionType == "1", "Screen On (Active)",
+        SB_PrevSessionType == "2", "Screen Off (Standby)",
+        strcat("Type ", SB_PrevSessionType)
+    ),
+    NextSessionType = case(
+        SB_NextSessionType == "1", "Screen On (Active)",
+        SB_NextSessionType == "2", "Screen Off (Standby)",
+        strcat("Type ", SB_NextSessionType)
+    ),
+    TransitionReason = case(
+        SB_Reason == "12", "User Input",
+        SB_Reason == "20", "Lid Open",
+        SB_Reason == "31", "Power Button",
+        SB_Reason == "7",  "Timer/Scheduled",
+        strcat("Code ", SB_Reason)
+    ),
+    OnACPower = iff(SB_PowerStateAc == "true", "Yes", "No")
+| project
+    TimeGenerated,
+    Computer,
+    BootId             = SB_BootId,
+    TransitionReason,
+    PrevSessionId      = SB_PrevSessionId,
+    PreviousSessionType,
+    PreviousSessionDuration,
+    NextSessionId      = SB_NextSessionId,
+    NextSessionType,
+    OnACPower
+| sort by TimeGenerated asc;
+PowerOnOff
+| extend Day = startofday(PowerOnTime)
+| summarize
+    TotalUptimeSeconds  = sum(toint(Uptime / 1s)),
+    BootCycles          = count(),
+    FirstBoot           = min(PowerOnTime),
+    LastShutdown        = max(PowerOffTime)
+    by Day, Computer
+| extend TotalUptimeFormatted = strcat(
+    toint(TotalUptimeSeconds / 86400), "d ",
+    toint((TotalUptimeSeconds % 86400) / 3600), "h ",
+    toint((TotalUptimeSeconds % 3600) / 60), "m ",
+    TotalUptimeSeconds % 60, "s"
+)
+| project Day, Computer, BootCycles, TotalUptimeFormatted, FirstBoot, LastShutdown
+| sort by Day asc;

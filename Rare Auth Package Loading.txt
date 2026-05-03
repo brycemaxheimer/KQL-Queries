@@ -1,0 +1,49 @@
+let Hostname  = "";
+let startTime = ago(14d);
+let endTime   = now();
+let rarityThreshold = 3; // adjust to needs of environment, longer timespan, higher threshold
+//
+let allPackageLoads = SecurityEvent
+| where TimeGenerated between (startTime .. endTime)
+//| where Computer has (Hostname) Uncomment for computer specific check
+| where EventID in (4610, 4611, 4614, 4622)
+| extend EventDescription = case(
+    EventID == 4610, "Auth Package Loaded",
+    EventID == 4611, "Trusted Logon Process Registered",
+    EventID == 4614, "Notification Package Loaded",
+    EventID == 4622, "Security Package Loaded",
+    "Other"
+)
+| extend RawPackageName = case(
+    isnotempty(extract(@'<Data Name="AuthenticationPackageName">(.*?)</Data>', 1, EventData)), extract(@'<Data Name="AuthenticationPackageName">(.*?)</Data>', 1, EventData),
+    isnotempty(extract(@'<Data Name="SecurityPackageName">(.*?)</Data>'      , 1, EventData)), extract(@'<Data Name="SecurityPackageName">(.*?)</Data>'      , 1, EventData),
+    isnotempty(extract(@'<Data Name="NotificationPackageName">(.*?)</Data>'  , 1, EventData)), extract(@'<Data Name="NotificationPackageName">(.*?)</Data>'  , 1, EventData),
+    AuthenticationPackageName
+)
+| where isnotempty(RawPackageName)
+| project TimeGenerated, EventID, EventDescription, RawPackageName, SubjectUserName, Computer;
+//
+let packageCounts = allPackageLoads
+| summarize
+    LoadCount = count(),
+    Users     = make_set(SubjectUserName),
+    FirstSeen = min(TimeGenerated),
+    LastSeen  = max(TimeGenerated),
+    Computers = make_set(Computer)
+  by
+    PackageName = RawPackageName,
+    EventID,
+    EventDescription;
+//
+packageCounts
+| where LoadCount < rarityThreshold
+| sort by LoadCount asc
+| project
+    EventDescription,
+    EventID,
+    Computers,
+    RarePackage = PackageName,
+    LoadCount,
+    Users,
+    FirstSeen,
+    LastSeen

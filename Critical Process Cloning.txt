@@ -1,0 +1,46 @@
+let CriticalProcesses = dynamic
+([
+    "lsass.exe"   , "csrss.exe"  , "winlogon.exe", "svchost.exe",
+    "services.exe", "wininit.exe", "smss.exe"
+]);
+SecurityEvent
+| where TimeGenerated > ago(1h)
+| where EventID     == 1 
+    and EventSourceName == 'Microsoft-Windows-Sysmon'
+| extend CleanXml   = replace_string(EventData, @' xmlns="http://schemas.microsoft.com/win/2004/08/events/event"', "")
+| extend ParsedXml  = parse_xml(CleanXml)
+| extend DataFields = ParsedXml.EventData.Data
+| mv-apply Field=DataFields on (
+    extend Key = tostring(Field['@Name']), Value = Field['#text']
+    | summarize UnpackedData = make_bag(bag_pack(Key, Value))
+)
+| evaluate bag_unpack(UnpackedData, "Left_")
+| extend
+    ImageName       = tolower(tostring(split(Left_Image, "\\")[-1])),
+    ParentImageName = tolower(tostring(split(Left_ParentImage, "\\")[-1]))
+| where ImageName  == ParentImageName
+| where ImageName in~ (CriticalProcesses)
+| extend
+    CloneTime       = Left_UtcTime
+    , ClonePid      = Left_ProcessId
+    , CloneGuid     = Left_ProcessGuid
+    , ParentPid     = Left_ParentProcessId
+    , ParentGuid    = Left_ParentProcessGuid
+    , ClonedProcess = ImageName
+    , TargetHost    = Computer
+| extend ClonePid   = replace_string(tostring(ClonePid),',',''),
+         ParentPid  = replace_string(tostring(ParentPid),',','')
+| project
+    CloneTime
+    , TargetHost
+    , ClonedProcess
+    , ParentImage    = Left_ParentImage
+    , CommandLine    = Left_CommandLine
+    , User           = Left_User
+    , ClonePid
+    , CloneGuid
+    , ParentPid
+    , ParentGuid
+    , Hashes         = Left_Hashes
+    , IntegrityLevel = Left_IntegrityLevel
+    , LogonGuid      = Left_LogonGuid

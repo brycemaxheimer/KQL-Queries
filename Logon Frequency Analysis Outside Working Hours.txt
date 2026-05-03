@@ -1,0 +1,33 @@
+let TargetHost          = "";  // exact match against Computer
+let LookbackTotal       = 90d; // total span for baseline + detection
+let BaselineWindow      = 75d; // baseline period (older)
+let DetectionWindow     = 15d; // detection period (recent)
+let HourBin             = 1h;  // anomaly bucket size
+let AnomalyThreshold    = 2.5; // series_decompose_anomalies sensitivity (1.5 noisy / 3.0 strict)
+let RarePctCutoff       = 0.5; // value seen in <0.5% of baseline rows = rare
+let SprayFailMin        = 15;  // minimum failed logons in window to qualify as spray
+let SprayDistinctUsers  = 5;   // distinct users targeted before flag
+let OffHoursStart       = 19;  // 7 PM local
+let OffHoursEnd         = 6;   // 6 AM local
+let TimeFrom            = ago(LookbackTotal);
+let DetectionFrom       = ago(DetectionWindow);
+let BaselineFrom        = ago(LookbackTotal);
+let BaselineTo          = ago(DetectionWindow);
+let LogonTypeBaseline =
+    SecurityEvent
+    | where TimeGenerated between (BaselineFrom .. BaselineTo)
+    | where Computer == TargetHost
+    | where EventID  == 4624
+    | summarize TypeCount = count() by LogonType
+    | extend TotalRows = toscalar(SecurityEvent | where TimeGenerated between (BaselineFrom .. BaselineTo) | where Computer == TargetHost | where EventID == 4624 | count)
+    | extend Pct = todouble(TypeCount) / todouble(TotalRows) * 100.0
+    | project LogonType, BaselinePct = round(Pct, 3);
+SecurityEvent
+| where TimeGenerated >= DetectionFrom
+| where Computer == TargetHost
+| where EventID == 4624
+| join kind=leftouter LogonTypeBaseline on LogonType
+| extend BaselinePct = coalesce(BaselinePct, 0.0)
+| where BaselinePct < RarePctCutoff
+| project TimeGenerated, Account, TargetUserName, LogonType, IpAddress, WorkstationName, BaselinePct
+| order by TimeGenerated desc

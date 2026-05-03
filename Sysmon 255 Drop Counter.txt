@@ -1,0 +1,26 @@
+let Hostname  = "";
+let startTime = datetime(2026-04-1);
+let endTime   = datetime(2026-04-30);
+//
+SecurityEvent
+| where TimeGenerated between (startTime .. endTime)
+| where Computer has (Hostname)
+| where EventSourceName == "Microsoft-Windows-Sysmon" 
+    and EventID == 255
+| project TimeGenerated, Computer, EventData
+| parse EventData with *'UtcTime">'EventCreation'</Data>'*
+| parse EventData with *'<Data Name="ID">'ID'</Data>'*
+| parse EventData with *'Events dropped from driver queue: 'Description'</Data>'*
+| where ID <> 'GetConfigurationOptions'
+| project EventCreation, Description, ID
+| extend EventTypeDropped = todynamic(replace_string(tostring(extract_all(@'(\w+:)', Description)), ':', '')),
+         NumberOfDropped  = extract_all(@'(\d+)', Description)
+| mv-expand EventTypeDropped, NumberOfDropped
+| extend EventTypeDropped=tostring(EventTypeDropped),
+         NumberOfDropped=tolong(NumberOfDropped)
+| project-away Description
+| summarize
+    EventsDropped = sum(NumberOfDropped),
+    IDs           = make_set(ID)
+  by EventTypeDropped
+| sort by EventsDropped desc
